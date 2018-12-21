@@ -1,1 +1,1 @@
-module blitter.com/go/gowebhook
+module blitter.com/go/gofish
