@@ -1,3 +1,4 @@
-gofish - A generic webhook wrapper to listen for events and dispatch commands
+# gofish - A generic webhook work dispatcher
 
-TBD - README
+
+gofish listens for webhook events, executing specified actions on receipt of matching POST endpoint requests.
