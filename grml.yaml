@@ -1,0 +1,44 @@
+env:
+  project: gofish
+  version: 0.1.0
+  buildDir: build/
+  docDir: doc/
+  releaseDir: ${project}-${version}/
+
+options:
+  debug: false
+  breakfast:
+    - sausage & spam
+    - spam, egg, sausage & spam
+    - spam, spam, beans, spam & spam
+
+commands:
+  release:
+    help: do full rebuild, docgen and store artifacts in ${releaseDir}
+    deps:
+      - vis
+      - app
+    exec: |
+      echo "TODO: cp binary and docs to ${releaseDir}"
+
+  install:
+    help: install binaries (root)
+    deps:
+      - app
+    as-root: false
+    exec: |
+      go install .
+
+  vis:
+    help: generate graphviz (via go-callvis)
+    deps:
+      - app
+    exec: |
+      echo "TODO: call go-callvis here, outputting to ${docDir}"
+
+  app:
+    aliases: [ build ]
+    help: build the gofish tool
+    exec: |
+      go clean . && go build .
+      echo "TODO: program output to ${buildDir}"
