@@ -70,13 +70,13 @@ func main() {
 				c.Dir = execRoot
 				c.Stdout = os.Stdout
 				c.Stderr = os.Stderr
-              cerr := c.Run()
-              if cerr != nil {
-                fmt.Printf("[exec.Cmd: %+v]\n", c)
-              } else {
-				w.Write([]byte("OK"))
-				fmt.Println("[done]")
-              }
+				cerr := c.Run()
+				if cerr != nil {
+					fmt.Printf("[exec.Cmd: %+v]\n", c)
+				} else {
+					w.Write([]byte("OK"))
+					fmt.Println("[done]")
+				}
 			})
 	}
 

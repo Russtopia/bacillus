@@ -10,3 +10,9 @@ $ grml install
 or
 
 $ go install .
+
+### Testing
+
+gofish can test itself by adding a webhook on the running system hosting the git repo, see
+example1.sh in the top folder.
+

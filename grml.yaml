@@ -40,5 +40,7 @@ commands:
     aliases: [ build ]
     help: build the gofish tool
     exec: |
-      go clean . && go build .
+      go clean .
+      gofmt -w .
+      go build .
       echo "TODO: program output to ${buildDir}"
