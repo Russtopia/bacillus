@@ -70,10 +70,13 @@ func main() {
 				c.Dir = execRoot
 				c.Stdout = os.Stdout
 				c.Stderr = os.Stderr
-				fmt.Printf("[exec.Cmd: %+v]\n", c)
-				c.Run()
+              cerr := c.Run()
+              if cerr != nil {
+                fmt.Printf("[exec.Cmd: %+v]\n", c)
+              } else {
 				w.Write([]byte("OK"))
 				fmt.Println("[done]")
+              }
 			})
 	}
 
