@@ -16,6 +16,4 @@ $ go install .
 gofish can test itself by adding a webhook on the running system hosting the git repo, see
 example1.sh in the top folder.
 
-TODO: Example webhook and githook usage, native git hooks vs. gogs custom_hooks?
-
-
+TODO: Example webhook and githook usage, native git hooks vs. gogs custom_hooks.
