@@ -20,10 +20,11 @@ const (
 )
 
 var (
-	execRoot string
-	addrPort string
-	hookStd  string
-	apiKey   string
+	execRoot     string
+	addrPort     string
+	hookStd      string
+	apiKey       string
+	attachStdout bool
 )
 
 // TODO: types for matching JSON events of
@@ -34,6 +35,7 @@ func main() {
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.StringVar(&hookStd, "t", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
+	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.Parse()
 	log.Printf("gofish %s startup\n", appVer)
 	log.Printf("listening on %s, type %s\n", addrPort, hookStd)
@@ -49,33 +51,27 @@ func main() {
 		}
 
 		cmdMap[tag] = cmd
-		fmt.Printf("Registering handler for %s/%s [action %s]...\n", hookStd, tag, cmd)
+		log.Printf("Registering handler for %s/%s [action %s]...\n", hookStd, tag, cmd)
 		http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 			func(w http.ResponseWriter, r *http.Request) {
-				log.Printf("Ooh a shiny hook that says '%s'! Let's bite...\n", r.URL)
-				//if cmdMap[tag][0] != '/' {
-				//	log.Printf("Activate command: [%s]\n", execRoot+"/"+cmdMap[tag])
-				//} else {
-				//	log.Printf("Activate command: [%s]\n", cmdMap[tag])
-				//}
-				// ...
 				cmdStrList := strings.Split(cmdMap[tag], " ")
 				cmdArgs := []string{""}
 				if len(cmdStrList) > 1 {
 					cmdArgs = cmdStrList[1:]
 				}
-				fmt.Println(cmdStrList)
-				fmt.Println(cmdArgs)
+				log.Printf("webhook '%s': %s\n", tag, cmdMap[tag])
 				c := exec.Command(cmdStrList[0], cmdArgs...)
 				c.Dir = execRoot
-				c.Stdout = os.Stdout
-				c.Stderr = os.Stderr
+				if attachStdout {
+					c.Stdout = os.Stdout
+					c.Stderr = os.Stderr
+				}
 				cerr := c.Run()
 				if cerr != nil {
-					fmt.Printf("[exec.Cmd: %+v]\n", c)
+					log.Printf("[exec.Cmd: %+v]\n", c)
 				} else {
 					w.Write([]byte("OK"))
-					fmt.Println("[done]")
+					log.Println("[done]")
 				}
 			})
 	}
