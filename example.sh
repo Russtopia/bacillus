@@ -1,17 +1,68 @@
 #!/bin/bash
+
+##
+## Example gofish launch script to trigger
+## work on a few demonstration webhook endpoints.
+##
+## Syntax of an endpoint:
+##  endpoint:jobDir:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
+##
+## gofish launches each worker within its own start location (eg., if one
+## starts gofish within /opt/gofish/, each worker starts off there),
+## but creates a per-job unique dir beneath _jobDir_ named gofish_<nnnn>
+## and sets GOFISH_WORKDIR to this path for use by the worker.
+## Each endpoint script should use GOFISH_WORKDIR to do its work and not
+## pollute other filesystem locations.
+##
+## Following the _jobDir_ field is a comma-delimited list of zero or more
+## user-defined environment variables, allowing unique job parameters to
+## be passed as part of the final _cmd_ field's shell environment.
+##
+## The final _cmd_ field is a set of one or more space-delimited arguments,
+## the first of which is the command itself (usually a user-defined script)
+## followed by zero or more arguments. NOTE that _cmd_ is launched via
+## Go's exec API which uses the POSIX exec() semantics (ie., it is not
+## launched via a shell) so bash-style variable expansions do NOT occur here.
+## Use the preceding EVAR assignments to pass in values to your scripts.
+##
+
+## SAMPLE ENDPOINT WORKERS
+##
+## onPush_hkexsh_build:
+##   -build Go hkexsh project within workdir/, retaining
+##    work artifacts within $GOFISH_WORKDIR (gofish_<nnnn>)
+##   -jobDir set explicitly to workdir (relative to gofish launch dir)
+##    running hkexsh_pushbuild.sh
+##
+## onPush_gofish_nop:
+##   -Output the pwd (set to /tmp via the jobDir field for this webhook
+##    endpoint. You won't see this as GOFISH_REMOVE_WORKDIR is set, unless
+##    you also pass -s to this launch script (where it will appear on the
+##    parent terminal rather than be output to $GOFISH_WORKDIR/console.out)
+##
+## onPush_gofish_nop_nocleanup:
+##   -Output the dir listing at $GOFISH_WORKDIR (here set to /tmp) to
+##    $GOFISH_WORKDIR/console.out
+##
+## onPush_gofish_install:
+##
+##   -build gofish itself (note the empty jobDir field, which implies
+##    GOFISH_WORKDIR is /tmp/gofish_<nnnn>). If jobDir is not specified,
+##    GOFISH_REMOVE_WORKDIR is implicitly set to avoid leaving files in /tmp.
+##
+## gofish will log worker activity to run.log in the current directory
+## (wherever gofish was launched from).
+## TODO: allow specifying location of run.log via an option
+
+# Pass '-s' to see stdout/stderr on gofish's controlling terminal rather than
+# output to <jobDir>/gofish_<nnnn>/console.out - for debugging
 OPTS="${1:-''}"
 
-## Example configuration launching the gofish webhook worker tool to handle
-## multiple jobs/projects.
-##  -- disparate projects, job environment variables, console
-##  -- output and optional workdir cleanup.
-
-## Listen for multiple endpoints. Build 'hkexsh' and 'gofish' projects
-## on webhook notifications of push events.
-
-## onPush_hkexsh_build - build https://blitter.com/gogs/RLabs/hkexsh
-## onPush_gofish_nop - Just print pwd
-## onPush_gofish_install - build and install https://blitter.com/gogs/Russtopia/gofish
+## Invoking each trigger using wget
+# $ wget 127.0.0.1:9990/blind/onPush_hkexsh_build
+# $ wget 127.0.0.1:9990/blind/onPush_gofish_nop
+# $ wget 127.0.0.1:9990/blind/onPush_gofish_nop_nocleanup
+# $ wget 127.0.0.1:9990/blind/onPush_gofish_install
 
 gofish "${OPTS}" \
  onPush_hkexsh_build:workdir:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
