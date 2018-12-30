@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -55,11 +56,11 @@ func main() {
 	for _, e := range flag.Args() {
 		fields := strings.Split(e, ":")
 		tag := fields[0]
-		var workDir string
+		var jobHomeDir string
 		var jobEnv []string
 		var cmd string
 		if len(fields) > 1 { /*&& fields[1] != "" {*/
-			workDir = fields[1]
+			jobHomeDir = fields[1]
 		}
 		if len(fields) > 2 { /*&& fields[2] != "" {*/
 			jobEnv = strings.Split(fields[2], ",")
@@ -82,12 +83,24 @@ func main() {
 					c := exec.Command(cmdStrList[0], cmdArgs...)
 					//c.Dir = execRoot
 
-					if workDir != "" {
-						c.Dir = workDir
+					if jobHomeDir == "" {
+						// if jobHomeDir is not specified, default will be
+						// main program's and always remove GOFISH_WORKDIR
+						// after the run (since this will imply use of /tmp
+						// and WORKDIR should not persist there)
+						c.Env = append(c.Env,
+							fmt.Sprintf("GOFISH_REMOVE_WORKDIR=1"))
+					} else {
+						// if jobHomeDir is set, set execution dir to
+						// it and let user define whether or not to persist
+						// WORKDIR via the GOFISH_WORKDIR env var.
+						jobHomeDir, _ = filepath.Abs(jobHomeDir)
+						c.Dir = jobHomeDir
 					}
 
-					var terr error
-					workDir, terr = ioutil.TempDir(os.TempDir(), "gofish_")
+					//var terr error
+					//var workDir string
+					workDir, terr := ioutil.TempDir(jobHomeDir, "gofish_")
 					if terr != nil {
 						log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
 					} else {
