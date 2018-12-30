@@ -26,7 +26,6 @@ var (
 	hookStd      string
 	apiKey       string
 	attachStdout bool
-	cleanWorkDir bool
 )
 
 // TODO: types for matching JSON events of
@@ -38,7 +37,6 @@ func main() {
 	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
-	flag.BoolVar(&cleanWorkDir, "c", false, "set to true to clean up worker dir")
 	flag.Parse()
 
 	logfile, _ := os.Create("run.log")
@@ -124,7 +122,8 @@ func main() {
 						} else {
 							log.Printf("[event %s completed with error %s]\n", tag, werr)
 						}
-						if cleanWorkDir {
+						if strings.Contains(strings.Join(c.Env, " "),
+							"GOFISH_REMOVE_WORKDIR") {
 							_ = os.RemoveAll(workDir)
 						}
 					}

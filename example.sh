@@ -14,6 +14,6 @@
 
 gofish \
  onPush_hkexsh_build:workers:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
- onPush_gofish_nop:/tmp:FOO=gofish:"pwd" \
+ onPush_gofish_nop:/tmp:GOFISH_REMOVE_WORKDIR=1,FOO=gofish:"pwd" \
  onPush_gofish_install::FOO=gofish:"go install ."
 
