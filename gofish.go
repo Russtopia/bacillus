@@ -7,12 +7,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -50,7 +52,26 @@ func main() {
 
 	log.Printf("Registering handler for /runlog page...\n")
 	http.HandleFunc("/runlog", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("TODO: /runlog page")
+		//header := w.Header()
+		w.Header().Set("Content-type", "text/html")
+		io.WriteString(w, `
+				<html>
+				<head>
+				<meta http-equiv="refresh" content="10">
+				</head>
+				<body>
+				`)
+		//w.Write([]byte(fmt.Sprintf("%+v", header)))
+		//w.Write([]byte("TODO: /runlog page\n"))
+		io.WriteString(w, "<pre>")
+		rl, _ := ioutil.ReadFile("run.log")
+		w.Write(rl)
+		io.WriteString(w, "</pre>")
+
+		io.WriteString(w, `
+				</body>
+				</html>
+				`)
 	})
 
 	for _, e := range flag.Args() {
@@ -79,7 +100,6 @@ func main() {
 					if len(cmdStrList) > 1 {
 						cmdArgs = cmdStrList[1:]
 					}
-					log.Printf("[webhook '%s': %s]\n", tag, cmdMap[tag])
 					c := exec.Command(cmdStrList[0], cmdArgs...)
 					//c.Dir = execRoot
 
@@ -101,6 +121,11 @@ func main() {
 					//var terr error
 					//var workDir string
 					workDir, terr := ioutil.TempDir(jobHomeDir, "gofish_")
+					jobID := strings.Split(workDir, "_")[1]
+					indent, _ := strconv.ParseInt(jobID, 10, 64)
+					indentStr := strings.Repeat("-", int(indent%8))
+					log.Printf("%s[webhook %s{%s}: %s]\n", indentStr,
+						tag, jobID, cmdMap[tag])
 					if terr != nil {
 						log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
 					} else {
@@ -115,6 +140,7 @@ func main() {
 
 						c.Env = append(c.Env, fmt.Sprintf("USER=%s", os.Getenv("USER")))
 						c.Env = append(c.Env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
+						c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBID=%s", jobID))
 						c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBTAG=%s", tag))
 						c.Env = append(c.Env, fmt.Sprintf("GOFISH_WORKDIR=%s", workDir))
 						c.Env = append(c.Env, jobEnv...)
@@ -124,16 +150,20 @@ func main() {
 							log.Printf("[exec.Cmd: %+v]\n", c)
 							w.WriteHeader(500)
 							w.Write([]byte("ERR"))
-							log.Printf("[ERROR on event %s trigger.]\n", tag)
+							log.Printf("%s[ERROR on event %s trigger.]\n", indentStr,
+								tag)
 						} else {
 							w.Write([]byte("OK"))
-							log.Printf("[event %s triggered. (workDir %s)]\n", tag, workDir)
+							log.Printf("%s[event %s{%s} triggered. (workDir %s)]\n", indentStr,
+								tag, jobID, workDir)
 						}
 						werr := c.Wait()
 						if werr == nil {
-							log.Printf("[event %s completed with status 0]\n", tag)
+							log.Printf("%s[webhook %s{%s} completed with status 0]\n", indentStr,
+								tag, jobID)
 						} else {
-							log.Printf("[event %s completed with error %s]\n", tag, werr)
+							log.Printf("%s[webhook %s{%s} completed with error %s]\n", indentStr,
+								tag, jobID, werr)
 						}
 						if strings.Contains(strings.Join(c.Env, " "),
 							"GOFISH_REMOVE_WORKDIR") {
