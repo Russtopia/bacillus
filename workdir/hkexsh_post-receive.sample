@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+"/home/git/go/src/github.com/gogs/gogs/gogs" hook --config='/home/git/go/src/github.com/gogs/gogs/custom/conf/app.ini' post-receive
+
+echo "--"
+echo "push hook"
+echo "--"
+
+/usr/bin/curl -s http://192.168.9.102:9990/blind/onPush_hkexsh_build
+
