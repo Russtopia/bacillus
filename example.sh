@@ -54,17 +54,13 @@
 ## (wherever gofish was launched from).
 ## TODO: allow specifying location of run.log via an option
 
-# Pass '-s' to see stdout/stderr on gofish's controlling terminal rather than
-# output to <jobDir>/gofish_<nnnn>/console.out - for debugging
-OPTS="${1:-''}"
-
 ## Invoking each trigger using wget
 # $ wget 127.0.0.1:9990/blind/onPush_hkexsh_build
 # $ wget 127.0.0.1:9990/blind/onPush_gofish_nop
 # $ wget 127.0.0.1:9990/blind/onPush_gofish_nop_nocleanup
 # $ wget 127.0.0.1:9990/blind/onPush_gofish_install
 
-gofish "${OPTS}" \
+gofish \
  onPush_hkexsh_build:workdir:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
  onPush_gofish_nop:/tmp:GOFISH_REMOVE_WORKDIR=1,FOO=gofish_nop1:"/bin/bash -c pwd" \
  onPush_gofish_nop_nocleanup:/tmp:FOO=gofish_nop2:"/bin/bash -c ls gofish*" \
