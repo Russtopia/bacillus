@@ -19,7 +19,7 @@ echo "curDir: $PWD"
 rm -rf build
 mkdir -p build
 cd build
-git clone https://blitter.com/gogs/RLabs/hkexsh
+git clone https://gogs.blitter.com/RLabs/hkexsh
 cd hkexsh
 ls
 
