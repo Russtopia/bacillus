@@ -24,18 +24,81 @@ const (
 )
 
 var (
-	//execRoot     string
 	addrPort     string
 	hookStd      string
 	apiKey       string
 	attachStdout bool
+	jobHomeDir   string
 )
 
 // TODO: types for matching JSON events of
 // supported webhooks: gogs.io, github, gitlab, ... ?
 
+func consoleHandler(w http.ResponseWriter, r *http.Request) {
+	if true {
+		//fmt.Fprint(w, "This is the console for ", r.URL)
+		consoleLog, e := ioutil.ReadFile(fmt.Sprintf("%s", r.URL)[1:])
+		if e != nil {
+			w.Write([]byte(fmt.Sprintf("%s", e)))
+			return
+		}
+		w.Header().Set("Content-type", "text/html")
+		io.WriteString(w, `
+				<html>
+				<head>
+				<meta http-equiv="refresh" content="5">
+				
+				<script>
+				bodyOrHtml = function() {
+					if ('scrollingElement' in document) {
+						return document.scrollingElement;
+					}
+					// Fallback for legacy browsers
+					if (navigator.userAgent.indexOf('WebKit') != -1) {
+						return document.body;
+					}
+					return document.documentElement;
+				}
+
+				scrollDown = function() {
+					//console.log('FOo');
+					bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
+				}
+				
+				window.onload = function() {
+					setTimeout (function () {
+						scrollDown(); //scrollTo(0,0);
+					}, 50); //100ms for example
+				}
+				</script>
+				
+				</head>
+				<body>
+				`)
+
+		io.WriteString(w, "<pre>")
+		w.Write(consoleLog)
+		io.WriteString(w, "</pre>")
+		io.WriteString(w, "<pre>\n\n\n\n</pre>")
+
+		//io.WriteString(w, `
+		//		<script>
+		//		  window.scrollTo(0,document.body.scrollHeight);
+		//		  //setTimeout(function (){location.reload()},5000);
+		//		</script>
+		//		`)
+
+		io.WriteString(w, `
+				</body>
+				</html>
+				`)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "404 - Page Not Found")
+	}
+}
+
 func main() {
-	//flag.StringVar(&execRoot, "r", "/tmp", "root path prefix for endpoint cmds")
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
@@ -74,20 +137,17 @@ func main() {
 				`)
 	})
 
+	jobHomeDir = "workdir"
 	for _, e := range flag.Args() {
 		fields := strings.Split(e, ":")
 		tag := fields[0]
-		var jobHomeDir string
 		var jobEnv []string
 		var cmd string
 		if len(fields) > 1 { /*&& fields[1] != "" {*/
-			jobHomeDir = fields[1]
+			jobEnv = strings.Split(fields[1], ",")
 		}
-		if len(fields) > 2 { /*&& fields[2] != "" {*/
-			jobEnv = strings.Split(fields[2], ",")
-		}
-		if len(fields) > 3 && fields[3] != "" {
-			cmd = fields[3]
+		if len(fields) > 2 && fields[2] != "" {
+			cmd = fields[2]
 		}
 
 		cmdMap[tag] = cmd
@@ -103,24 +163,14 @@ func main() {
 					c := exec.Command(cmdStrList[0], cmdArgs...)
 					//c.Dir = execRoot
 
-					if jobHomeDir == "" {
-						// if jobHomeDir is not specified, default will be
-						// main program's and always remove GOFISH_WORKDIR
-						// after the run (since this will imply use of /tmp
-						// and WORKDIR should not persist there)
-						c.Env = append(c.Env,
-							fmt.Sprintf("GOFISH_REMOVE_WORKDIR=1"))
-					} else {
-						// if jobHomeDir is set, set execution dir to
-						// it and let user define whether or not to persist
-						// WORKDIR via the GOFISH_WORKDIR env var.
-						jobHomeDir, _ = filepath.Abs(jobHomeDir)
-						c.Dir = jobHomeDir
-					}
+					// if jobHomeDir is set, set execution dir to
+					// it and let user define whether or not to persist
+					// WORKDIR via the GOFISH_WORKDIR env var.
+					c.Dir, _ = filepath.Abs(jobHomeDir)
 
 					//var terr error
 					//var workDir string
-					workDir, terr := ioutil.TempDir(jobHomeDir, "gofish_")
+					workDir, terr := ioutil.TempDir(c.Dir, "gofish_")
 					jobID := strings.Split(workDir, "_")[1]
 					indent, _ := strconv.ParseInt(jobID, 10, 64)
 					indentStr := strings.Repeat("-", int(indent%8))
@@ -129,11 +179,14 @@ func main() {
 					if terr != nil {
 						log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
 					} else {
+						var workerOutputPath string
+						consoleFile := "console.out"
+						workerOutputPath = workDir + "/" + consoleFile
 						if attachStdout {
 							c.Stdout = os.Stdout
 							c.Stderr = os.Stderr
 						} else {
-							workerOutputFile, _ := os.Create(workDir + "/console.out")
+							workerOutputFile, _ := os.Create(workerOutputPath)
 							c.Stdout = workerOutputFile
 							c.Stderr = workerOutputFile
 						}
@@ -156,6 +209,8 @@ func main() {
 							w.Write([]byte("OK"))
 							log.Printf("%s[event %s{%s} triggered. (workDir %s)]\n", indentStr,
 								tag, jobID, workDir)
+							log.Printf("%s[console log:<a href=\"%s/gofish_%s/"+consoleFile+"\">%s/gofish_%s/console.log</a>]\n", indentStr,
+								jobHomeDir, jobID, jobHomeDir, jobID)
 						}
 						werr := c.Wait()
 						if werr == nil {
@@ -174,14 +229,10 @@ func main() {
 			})
 	}
 
+	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
+
 	err := http.ListenAndServe(addrPort, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
-
-//func hookHandler(w http.ResponseWriter, r *http.Request) {
-//	log.Println("Ooh a shiny hook! Let's bite...")
-//	// ...
-//	w.Write([]byte("OK"))
-//}
