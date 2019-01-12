@@ -36,12 +36,24 @@ var (
 
 func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	if true {
-		//fmt.Fprint(w, "This is the console for ", r.URL)
 		consoleLog, e := ioutil.ReadFile(fmt.Sprintf("%s", r.URL)[1:])
 		if e != nil {
 			w.Write([]byte(fmt.Sprintf("%s", e)))
 			return
 		}
+
+		lines := strings.Split(string(consoleLog), "\n")
+		tailL := 60
+		l := len(lines) - tailL
+		if l < 0 {
+			l = 0
+		}
+		tail := lines[l:]
+		if l > 0 {
+			consoleLog = []byte("[click here for full log]\n...\n" +
+				strings.Join(tail, "\n"))
+		}
+
 		w.Header().Set("Content-type", "text/html")
 		io.WriteString(w, `
 				<html>
@@ -79,15 +91,10 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "<pre>")
 		w.Write(consoleLog)
 		io.WriteString(w, "</pre>")
-		io.WriteString(w, "<pre>\n\n\n\n</pre>")
+		io.WriteString(w, "<pre>\n\n\n</pre>")
+		// TODO: Consider a js spinner here, eg. <span id="spinner"></span>
 
-		//io.WriteString(w, `
-		//		<script>
-		//		  window.scrollTo(0,document.body.scrollHeight);
-		//		  //setTimeout(function (){location.reload()},5000);
-		//		</script>
-		//		`)
-
+		w.Write([]byte(fmt.Sprintln(r.URL)))
 		io.WriteString(w, `
 				</body>
 				</html>

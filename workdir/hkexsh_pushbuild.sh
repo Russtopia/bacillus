@@ -23,7 +23,7 @@ git clone https://gogs.blitter.com/RLabs/hkexsh
 cd hkexsh
 ls
 
+for i in $(seq 1 20); do echo Doing stuff ${i}...; sleep 1; done
+
 make all
 echo "--Done--"
-
-
