@@ -60,30 +60,65 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 				<head>
 				<meta http-equiv="refresh" content="5">
 				
-				<script>
-				bodyOrHtml = function() {
-					if ('scrollingElement' in document) {
-						return document.scrollingElement;
-					}
-					// Fallback for legacy browsers
-					if (navigator.userAgent.indexOf('WebKit') != -1) {
-						return document.body;
-					}
-					return document.documentElement;
-				}
+				<style>
+				  div {
+				    position: fixed;
+					left: 1em; bottom: 1em;
+					font-family: monospace;
+					margin: 1em;
+					font-size: 1.5em;
+					font-weight: normal; //bold;
+					background: darkgreen;
+					border: dotted 2px;
+					border-radius: 1em;
+				  }
+				</style>
 
-				scrollDown = function() {
-					//console.log('FOo');
-					bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
-				}
-				
-				window.onload = function() {
+				<script>
+				  bodyOrHtml = function() {
+				    if ('scrollingElement' in document) {
+					  return document.scrollingElement;
+			  		}
+					// Fallback for legacy browsers
+					if (navigator.user-Agent.indexOf('WebKit') != -1) {
+					  return document.body;
+			  		}
+					return document.documentElement;
+				  }
+
+				  scrollDown = function() {
+				    console.log('FOo');
 					setTimeout (function () {
-						scrollDown(); //scrollTo(0,0);
-					}, 50); //100ms for example
-				}
+					  bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
+	  				}, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
+				  }
+
+				  appendSpinner = function() {
+					var spinners = [
+						"|/-\\",
+						".oO@*",
+						[">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
+					];
+
+					var el = document.createElement('div');
+					document.body.appendChild(el);
+					var spinner = spinners[0];
+					
+					(function(spinner,el) {
+					  var i = 0;
+					  setInterval(function() {
+						el.innerHTML = spinner[i];
+						i = (i + 1) % spinner.length;
+					  }, 300);
+					})(spinner,el);
+				  }
+
+				  window.onload = function() {
+					appendSpinner();
+					scrollDown(); //scrollTo(0,0);
+				  }
 				</script>
-				
+
 				</head>
 				<body>
 				`)
