@@ -35,6 +35,8 @@ commands:
       - app
     exec: |
       echo "TODO: call go-callvis here, outputting to ${docDir}"
+      go-callvis -file gofish-vis -format png -ignore bytes,errors,flag,fmt,internal,io,log,net,os,path,runtime,time,strings,sync,syscall,binary,encoding -group pkg,type .
+      ./fixup-gv.sh gofish.go && cat gofish-vis.gv | dot -Tpng -ogofish-vis-fixedup.png
 
   app:
     aliases: [ build ]

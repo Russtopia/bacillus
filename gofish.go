@@ -91,11 +91,11 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	var codeColor string
 	var statWord string
 	if code != 0 {
-			codeColor = "finErrMarker"
-			statWord = "ERR"
+		codeColor = "finErrMarker"
+		statWord = "ERR"
 	} else {
-			codeColor = "finOKMarker"
-			statWord = "Done"
+		codeColor = "finOKMarker"
+		statWord = "Done"
 	}
 
 	if stat == 'r' {
@@ -127,7 +127,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		spinnerCode = `appendSpinner = function() {
 					var el = document.createElement('div');
 					el.setAttribute('id', '` + codeColor + `');
-					el.innerHTML = '`+statWord+`';
+					el.innerHTML = '` + statWord + `';
 					document.body.appendChild(el);
 					}
 					`
