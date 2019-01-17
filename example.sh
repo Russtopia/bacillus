@@ -63,6 +63,11 @@
 
 OPTS=${1:-''}
 
+if [ -e run.log ]; then
+  echo "Rolling previous log to run.log.bak"
+  mv -f run.log run.log.bak
+fi
+
 gofish "${OPTS}" \
  onPush_hkexsh_build:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
  onPush_hkexsh_build_rwd:FOO=bar,BAZ=buzz,GOFISH_REMOVE_WORKDIR=1:"./hkexsh_pushbuild.sh" \

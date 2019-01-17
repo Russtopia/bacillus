@@ -89,10 +89,13 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	var refreshStr string
 	var spinnerCode string
 	var codeColor string
+	var statWord string
 	if code != 0 {
-		codeColor = "finErrMarker"
+			codeColor = "finErrMarker"
+			statWord = "ERR"
 	} else {
-		codeColor = "finOKMarker"
+			codeColor = "finOKMarker"
+			statWord = "Done"
 	}
 
 	if stat == 'r' {
@@ -124,7 +127,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		spinnerCode = `appendSpinner = function() {
 					var el = document.createElement('div');
 					el.setAttribute('id', '` + codeColor + `');
-					el.innerHTML = 'DONE';
+					el.innerHTML = '`+statWord+`';
 					document.body.appendChild(el);
 					}
 					`
@@ -297,7 +300,7 @@ func main() {
 					workDir, terr := ioutil.TempDir(c.Dir, "gofish_")
 					jobID := strings.Split(workDir, "_")[1]
 					indent, _ := strconv.ParseInt(jobID, 10, 64)
-					indentStr := strings.Repeat("-", int(indent%8))
+					indentStr := strings.Repeat("-", int(indent%8)+1)
 					log.Printf("%s[webhook %s{%s}: %s]\n", indentStr,
 						tag, jobID, cmdMap[tag])
 					if terr != nil {
