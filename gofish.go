@@ -66,10 +66,14 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	consStat := lines[0]
 	fullConsLink := lines[1]
 	tail := lines[2:]
-	
+
 	//TODO: analyze line 1, if status == 'f' and exitCode == '000' then suppress spinner
 	// and reload timer; if exitCode != '000', consider red static '!' in place of spinner
 	// (and still no reload)
+	var stat rune
+	var code int //TODO: use to determine red failure marker?
+	n, e := fmt.Sscanf(consStat, "[%c %03d]", &stat, &code)
+	_ = n
 	if l > 0 {
 		consoleLog = []byte(consStat + "\n" + fullConsLink + "\n" +
 			strings.Join(tail, "\n"))
@@ -77,12 +81,46 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		consoleLog = []byte(consStat + "\n\n" + strings.Join(tail, "\n"))
 	}
 
+	var refreshStr string
+	var spinnerCode string
+	if stat == 'r' {
+		refreshStr = `<meta http-equiv="refresh" content="5">`
+		spinnerCode = `				  appendSpinner = function() {
+					var spinners = [
+						"|/-\\",
+						".oO@*",
+						[">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
+					];
+
+					var el = document.createElement('div');
+					el.setAttribute('id', 'spinner');
+					document.body.appendChild(el);
+					var spinner = spinners[0];
+					
+					(function(spinner,el) {
+					  var i = 0;
+					  setInterval(function() {
+						el.innerHTML = spinner[i];
+						i = (i + 1) % spinner.length;
+					  }, 300);
+					})(spinner,el);
+				  }
+
+				  window.onload = function() {
+					appendSpinner();
+					scrollDown(); //scrollTo(0,0);
+				  }
+`
+	} else {
+		refreshStr = ``
+		spinnerCode = ``
+	}
+
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
 				<html>
 				<head>
-				<meta http-equiv="refresh" content="5">
-				
+				`+refreshStr+`
 				<style>
 				  #spinner {
 				    position: fixed;
@@ -118,32 +156,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 					  bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
 	  				}, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
 				  }
-
-				  appendSpinner = function() {
-					var spinners = [
-						"|/-\\",
-						".oO@*",
-						[">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
-					];
-
-					var el = document.createElement('div');
-					el.setAttribute('id', 'spinner');
-					document.body.appendChild(el);
-					var spinner = spinners[0];
-					
-					(function(spinner,el) {
-					  var i = 0;
-					  setInterval(function() {
-						el.innerHTML = spinner[i];
-						i = (i + 1) % spinner.length;
-					  }, 300);
-					})(spinner,el);
-				  }
-
-				  window.onload = function() {
-					appendSpinner();
-					scrollDown(); //scrollTo(0,0);
-				  }
+`+spinnerCode+`
 				</script>
 
 				</head>
