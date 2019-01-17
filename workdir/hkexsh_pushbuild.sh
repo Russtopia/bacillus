@@ -27,3 +27,11 @@ for i in $(seq 1 20); do echo Doing stuff ${i}...; sleep 1; done
 
 make all
 echo "--Done--"
+## For demonstration, succeed or fail based on GOFISH_JOBID's evenness
+if [ $(( ${GOFISH_JOBID#0} % 2 )) -eq 0 ]; then
+  echo "Succeeded."
+  exit 0
+else
+  echo "FAILED!"
+  exit 1
+fi
