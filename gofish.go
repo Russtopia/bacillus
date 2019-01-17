@@ -354,14 +354,6 @@ func main() {
 						}
 						werr := c.Wait()
 
-						//						if workerOutputFile != nil {
-						//								offs, serr := workerOutputFile.Seek(0, 0)
-						//								fmt.Println(offs)
-						//							if serr != nil {
-						//								fmt.Printf(fmt.Sprintf("%s", serr))
-						//							}
-						//						}
-
 						if werr, ok := werr.(*exec.ExitError); ok {
 							// The program has exited with an exit code != 0
 
@@ -372,6 +364,8 @@ func main() {
 							var exitStatus uint32
 							if status, ok := werr.Sys().(syscall.WaitStatus); ok {
 								exitStatus = uint32(status.ExitStatus())
+								// exec.Cmd automatically closes its files on exit, so we need to
+								// reopen here to write the status at offset 0
 								workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
 								fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
 								//log.Print(c.Stderr /*stdErrBuffer*/)
