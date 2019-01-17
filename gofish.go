@@ -390,8 +390,8 @@ func main() {
 							log.Printf("%s[webhook %s{%s} completed with status 0]\n", indentStr,
 								tag, jobID)
 						} else {
-							log.Printf("%s[webhook %s{%s} completed with error %s]\n", indentStr,
-								tag, jobID, werr)
+							log.Printf("%s[webhook <a href=\"%s\">%s{%s}</a> completed with error %s]\n", indentStr,
+								workerOutputRelPath, tag, jobID, werr)
 						}
 						if strings.Contains(strings.Join(c.Env, " "),
 							"GOFISH_REMOVE_WORKDIR") {
