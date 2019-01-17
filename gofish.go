@@ -58,14 +58,14 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	lines := strings.Split(string(consoleLog), "\n")
 	// Prevent log output from creating huge web pages.
 	// TODO: Add logic to link to full console log on first line
-	tailL := 80
+	tailL := 34
 	l := len(lines) - tailL
 	if l < 0 {
 		l = 0
 	}
 	consStat := lines[0]
 	fullConsLink := lines[1]
-	tail := lines[2:]
+	var tail []string
 
 	//TODO: analyze line 1, if status == 'f' and exitCode == '000' then suppress spinner
 	// and reload timer; if exitCode != '000', consider red static '!' in place of spinner
@@ -75,17 +75,29 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	n, e := fmt.Sscanf(consStat, "[%c %03d]", &stat, &code)
 	_ = n
 	if l > 0 {
-		consoleLog = []byte(consStat + "\n" + fullConsLink + "\n" +
-			strings.Join(tail, "\n"))
+		tail = lines[len(lines)-tailL:]
+		//consoleLog = []byte(consStat + "\n" + fullConsLink + "\n" +
+		//	strings.Join(tail, "\n"))
+		_ = fullConsLink
+		consoleLog = []byte("<a href=\"" + fullConsLink + "\">full log</a>\n" + strings.Join(tail, "\n"))
 	} else {
-		consoleLog = []byte(consStat + "\n\n" + strings.Join(tail, "\n"))
+		tail = lines[2:]
+		//consoleLog = []byte(consStat + "\n\n" + strings.Join(tail, "\n"))
+		consoleLog = []byte(strings.Join(tail, "\n"))
 	}
 
 	var refreshStr string
 	var spinnerCode string
+	var codeColor string
+	if code != 0 {
+		codeColor = "finErrMarker"
+	} else {
+		codeColor = "finOKMarker"
+	}
+
 	if stat == 'r' {
 		refreshStr = `<meta http-equiv="refresh" content="5">`
-		spinnerCode = `				  appendSpinner = function() {
+		spinnerCode = `appendSpinner = function() {
 					var spinners = [
 						"|/-\\",
 						".oO@*",
@@ -95,6 +107,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 					var el = document.createElement('div');
 					el.setAttribute('id', 'spinner');
 					document.body.appendChild(el);
+					el.innerHTML = '.';
 					var spinner = spinners[0];
 					
 					(function(spinner,el) {
@@ -105,15 +118,16 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 					  }, 300);
 					})(spinner,el);
 				  }
-
-				  window.onload = function() {
-					appendSpinner();
-					scrollDown(); //scrollTo(0,0);
-				  }
 `
 	} else {
 		refreshStr = ``
-		spinnerCode = ``
+		spinnerCode = `appendSpinner = function() {
+					var el = document.createElement('div');
+					el.setAttribute('id', '` + codeColor + `');
+					el.innerHTML = 'DONE';
+					document.body.appendChild(el);
+					}
+					`
 	}
 
 	w.Header().Set("Content-type", "text/html")
@@ -127,11 +141,38 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 					right: 1em; bottom: 1em;
 					font-family: monospace;
 					margin: 1em;
+					padding: 0.2em;
 					font-size: 1.5em;
 					font-weight: normal; //bold;
-					background: darkgreen;
+					background: skyblue;
 					border: dotted 2px;
 					border-radius: 1em;
+				  }
+				  
+				  #finOKMarker {
+						  position: fixed;
+						  right: 1em; bottom: 1em;
+						  font-family: monospace;
+						  margin: 1em;
+						  padding: 0.2em;
+						  font-size: 1.5em;
+						  font-weight: normal;
+						  background: lightgreen;
+						  border: dotted 2px;
+						  border-radius: 1em;
+				  }
+				  
+				  #finErrMarker {
+						  position: fixed;
+						  right: 1em; bottom: 1em;
+						  font-family: monospace;
+						  margin: 1em;
+						  padding: 0.2em;
+						  font-size: 1.5em;
+						  font-weight: bold;
+						  background: red;
+						  border: dotted 2px;
+						  border-radius: 1em;
 				  }
 				  
 				  //#stat {
@@ -157,6 +198,11 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	  				}, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
 				  }
 `+spinnerCode+`
+
+				  window.onload = function() {
+					appendSpinner();
+					scrollDown(); //scrollTo(0,0);
+				  }
 				</script>
 
 				</head>
@@ -284,7 +330,7 @@ func main() {
 						//  2: completion status: <n> = exit status, 0 = success; else failure
 						//     status uses UNIX shell exit status convention (base 10 0-255))
 						_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
-						_, err = fmt.Fprintf(c.Stdout, "%s\n", workerOutputRelPath)
+						_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -325,7 +371,7 @@ func main() {
 								exitStatus = uint32(status.ExitStatus())
 								workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
 								fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
-								log.Print(c.Stderr /*stdErrBuffer*/)
+								//log.Print(c.Stderr /*stdErrBuffer*/)
 								log.Printf("Exit Status: %d\n", exitStatus) //#
 							}
 						} else {

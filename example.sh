@@ -65,6 +65,7 @@ OPTS=${1:-''}
 
 gofish "${OPTS}" \
  onPush_hkexsh_build:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
+ onPush_hkexsh_build_rwd:FOO=bar,BAZ=buzz,GOFISH_REMOVE_WORKDIR=1:"./hkexsh_pushbuild.sh" \
  onPush_gofish_nop:GOFISH_REMOVE_WORKDIR=1,FOO=gofish_nop1:"/bin/bash -c pwd" \
  onPush_gofish_nop_nocleanup:FOO=gofish_nop2:"/bin/bash -c ls gofish*" \
  onPush_gofish_install:FOO=gofish:"go install ."
