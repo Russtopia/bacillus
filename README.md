@@ -47,4 +47,18 @@ In summary, to perform build/CI tasks with gofish, one should
 
 ## TODOs
 * TODO: Add cmdline option to specify location of run.log (currently gofish launch dir)
-* TODO: [?] Add companion tools (console & web) to show recent run activity
+
+## Example Run
+[terminal A - CI server]
+```
+$ cd go/src/blitter.com/go/gofish
+$ go install . && ./example.sh
+```
+
+[terminal B - client event test]
+
+```
+$ curl -s http://localhost:9990/blind/onPush_hkexsh_build
+```
+
+Observe execution on localhost:9990/runlog
