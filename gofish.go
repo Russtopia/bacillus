@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -34,36 +35,58 @@ var (
 // TODO: types for matching JSON events of
 // supported webhooks: gogs.io, github, gitlab, ... ?
 
+func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
+	consoleLog, e := ioutil.ReadFile(strings.Replace(fmt.Sprintf("%s", r.URL)[1:], "/fullconsole", "", 1))
+	if e != nil {
+		w.Write([]byte(fmt.Sprintf("%s", e)))
+		return
+	}
+	w.Header().Set("Content-type", "text/plain")
+	w.Write(consoleLog)
+}
+
 func consoleHandler(w http.ResponseWriter, r *http.Request) {
-	if true {
-		consoleLog, e := ioutil.ReadFile(fmt.Sprintf("%s", r.URL)[1:])
-		if e != nil {
-			w.Write([]byte(fmt.Sprintf("%s", e)))
-			return
-		}
+	//if true {
 
-		lines := strings.Split(string(consoleLog), "\n")
-		tailL := 60
-		l := len(lines) - tailL
-		if l < 0 {
-			l = 0
-		}
-		tail := lines[l:]
-		if l > 0 {
-			consoleLog = []byte("[click here for full log]\n...\n" +
-				strings.Join(tail, "\n"))
-		}
+	// Read file from URL, removing leading / as workdir is rel to us
+	consoleLog, e := ioutil.ReadFile(fmt.Sprintf("%s", r.URL)[1:])
+	if e != nil {
+		w.Write([]byte(fmt.Sprintf("%s", e)))
+		return
+	}
 
-		w.Header().Set("Content-type", "text/html")
-		io.WriteString(w, `
+	lines := strings.Split(string(consoleLog), "\n")
+	// Prevent log output from creating huge web pages.
+	// TODO: Add logic to link to full console log on first line
+	tailL := 80
+	l := len(lines) - tailL
+	if l < 0 {
+		l = 0
+	}
+	consStat := lines[0]
+	fullConsLink := lines[1]
+	tail := lines[2:]
+	
+	//TODO: analyze line 1, if status == 'f' and exitCode == '000' then suppress spinner
+	// and reload timer; if exitCode != '000', consider red static '!' in place of spinner
+	// (and still no reload)
+	if l > 0 {
+		consoleLog = []byte(consStat + "\n" + fullConsLink + "\n" +
+			strings.Join(tail, "\n"))
+	} else {
+		consoleLog = []byte(consStat + "\n\n" + strings.Join(tail, "\n"))
+	}
+
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
 				<html>
 				<head>
 				<meta http-equiv="refresh" content="5">
 				
 				<style>
-				  div {
+				  #spinner {
 				    position: fixed;
-					left: 1em; bottom: 1em;
+					right: 1em; bottom: 1em;
 					font-family: monospace;
 					margin: 1em;
 					font-size: 1.5em;
@@ -72,6 +95,10 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 					border: dotted 2px;
 					border-radius: 1em;
 				  }
+				  
+				  //#stat {
+					//display: none;
+				  //}
 				</style>
 
 				<script>
@@ -87,7 +114,6 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 				  }
 
 				  scrollDown = function() {
-				    console.log('FOo');
 					setTimeout (function () {
 					  bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
 	  				}, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
@@ -101,6 +127,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 					];
 
 					var el = document.createElement('div');
+					el.setAttribute('id', 'spinner');
 					document.body.appendChild(el);
 					var spinner = spinners[0];
 					
@@ -123,21 +150,20 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 				<body>
 				`)
 
-		io.WriteString(w, "<pre>")
-		w.Write(consoleLog)
-		io.WriteString(w, "</pre>")
-		io.WriteString(w, "<pre>\n\n\n</pre>")
-		// TODO: Consider a js spinner here, eg. <span id="spinner"></span>
+	io.WriteString(w, "<pre>")
+	w.Write(consoleLog)
+	io.WriteString(w, "</pre>")
+	io.WriteString(w, "<pre>\n\n\n</pre>")
 
-		w.Write([]byte(fmt.Sprintln(r.URL)))
-		io.WriteString(w, `
+	w.Write([]byte(fmt.Sprintln(r.URL)))
+	io.WriteString(w, `
 				</body>
 				</html>
 				`)
-	} else {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "404 - Page Not Found")
-	}
+	//} else {
+	//	w.WriteHeader(http.StatusNotFound)
+	//	fmt.Fprint(w, "404 - Page Not Found")
+	//}
 }
 
 func main() {
@@ -157,7 +183,6 @@ func main() {
 
 	log.Printf("Registering handler for /runlog page...\n")
 	http.HandleFunc("/runlog", func(w http.ResponseWriter, r *http.Request) {
-		//header := w.Header()
 		w.Header().Set("Content-type", "text/html")
 		io.WriteString(w, `
 				<html>
@@ -166,8 +191,6 @@ func main() {
 				</head>
 				<body>
 				`)
-		//w.Write([]byte(fmt.Sprintf("%+v", header)))
-		//w.Write([]byte("TODO: /runlog page\n"))
 		io.WriteString(w, "<pre>")
 		rl, _ := ioutil.ReadFile("run.log")
 		w.Write(rl)
@@ -222,13 +245,15 @@ func main() {
 						log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
 					} else {
 						var workerOutputPath string
-						consoleFile := "console.out"
-						workerOutputPath = workDir + "/" + consoleFile
+						var workerOutputFile *os.File
+						consoleFName := "console.out"
+						workerOutputPath = workDir + "/" + consoleFName
+						workerOutputRelPath := fmt.Sprintf("%s/gofish_%s/%s", jobHomeDir, jobID, consoleFName)
 						if attachStdout {
 							c.Stdout = os.Stdout
 							c.Stderr = os.Stderr
 						} else {
-							workerOutputFile, _ := os.Create(workerOutputPath)
+							workerOutputFile, _ = os.Create(workerOutputPath)
 							c.Stdout = workerOutputFile
 							c.Stderr = workerOutputFile
 						}
@@ -239,6 +264,17 @@ func main() {
 						c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBTAG=%s", tag))
 						c.Env = append(c.Env, fmt.Sprintf("GOFISH_WORKDIR=%s", workDir))
 						c.Env = append(c.Env, jobEnv...)
+
+						// Job output status is encoded in first line of output log.
+						// [1 2]
+						//  1: state: r = running f = finished
+						//  2: completion status: <n> = exit status, 0 = success; else failure
+						//     status uses UNIX shell exit status convention (base 10 0-255))
+						_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
+						_, err = fmt.Fprintf(c.Stdout, "%s\n", workerOutputRelPath)
+						if err != nil {
+							log.Fatal(err)
+						}
 
 						cerr := c.Start()
 						if cerr != nil {
@@ -251,10 +287,45 @@ func main() {
 							w.Write([]byte("OK"))
 							log.Printf("%s[event %s{%s} triggered. (workDir %s)]\n", indentStr,
 								tag, jobID, workDir)
-							log.Printf("%s[console log:<a href=\"%s/gofish_%s/"+consoleFile+"\">%s/gofish_%s/console.log</a>]\n", indentStr,
-								jobHomeDir, jobID, jobHomeDir, jobID)
+							log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
+								workerOutputRelPath, workerOutputRelPath)
 						}
 						werr := c.Wait()
+
+						//						if workerOutputFile != nil {
+						//								offs, serr := workerOutputFile.Seek(0, 0)
+						//								fmt.Println(offs)
+						//							if serr != nil {
+						//								fmt.Printf(fmt.Sprintf("%s", serr))
+						//							}
+						//						}
+
+						if werr, ok := werr.(*exec.ExitError); ok {
+							// The program has exited with an exit code != 0
+
+							// This works on both Unix and Windows. Although package
+							// syscall is generally platform dependent, WaitStatus is
+							// defined for both Unix and Windows and in both cases has
+							// an ExitStatus() method with the same signature.
+							var exitStatus uint32
+							if status, ok := werr.Sys().(syscall.WaitStatus); ok {
+								exitStatus = uint32(status.ExitStatus())
+								workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
+								fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
+								log.Print(c.Stderr /*stdErrBuffer*/)
+								log.Printf("Exit Status: %d\n", exitStatus) //#
+							}
+						} else {
+							// exec.Cmd automatically closes its files on exit, so we need to
+							// reopen here to write the status at offset 0
+							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
+							fmt.Fprintf(workerOutputFile, "[f %03d]", 0)
+							//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
+						}
+
+						// TODO: exitStatus output to.. job.status ? (int exitStatus)
+						// TODO: console log endpoint check for existence of job.status;
+
 						if werr == nil {
 							log.Printf("%s[webhook %s{%s} completed with status 0]\n", indentStr,
 								tag, jobID)
@@ -272,6 +343,7 @@ func main() {
 	}
 
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
+	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
 
 	err := http.ListenAndServe(addrPort, nil)
 	if err != nil {
