@@ -92,7 +92,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	var statWord string
 	if code != 0 {
 		codeColor = "finErrMarker"
-		statWord = "ERR"
+		statWord = fmt.Sprintf("E:%d", code)
 	} else {
 		codeColor = "finOKMarker"
 		statWord = "Done"
@@ -282,6 +282,10 @@ func main() {
 		http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 			func(w http.ResponseWriter, r *http.Request) {
 				go func() {
+					//log.Printf("URL params:%+v\n", r.URL.Query())
+					//if r.URL.Query()["p1"] != nil {
+					//	log.Printf("p1:%s", r.URL.Query()["p1"][0])
+					//}
 					cmdStrList := strings.Split(cmdMap[tag], " ")
 					cmdArgs := []string{""}
 					if len(cmdStrList) > 1 {

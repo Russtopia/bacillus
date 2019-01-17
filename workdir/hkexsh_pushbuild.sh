@@ -33,5 +33,5 @@ if [ $(( ${GOFISH_JOBID#0} % 2 )) -eq 0 ]; then
   exit 0
 else
   echo "FAILED!"
-  exit 1
+  exit 252
 fi
