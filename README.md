@@ -1,24 +1,19 @@
 # gofish - A generic webhook work dispatcher
 
 
-gofish listens for webhook events, executing specified actions on receipt
-of matching POST endpoint requests.
+gofish listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from git commit hooks, or anything else one can think of.
+
 
 ## Rationale
 
-The goal of the project is to offer an extremely minimal Automated Build and
+The goal of this project is to offer an extremely minimal Build Automation and
 Continuous Integration (CI) system, with zero dependencies on large
 frameworks, containers, etc. (though jobs invoked by gofish are free to use
 whatever build/test frameworks are available).
 
 Existing automated build/CI systems such as Jenkins, buildbot, concourse,
-and so on are somewhat large and/or difficult to set up, or require
+and so on are somewhat large and/or difficult to set up, and require
 large external components (java, docker).
-
-If one just wants something to respond to git commit hooks and/or
-webhooks from other git web-hosting tools (gogs.io, gitlab, github, ...) and
-in response run build/test/package steps, gofish is intended to be a much
-simpler solution.
 
 
 ### Building and Installing
@@ -31,12 +26,9 @@ gofish, being a simple tool, has little configuration. The repository contains
 two sample scripts:
 
 * example.sh - launch gofish with a few demo endpoints
-* workdir/hkexsh_pushbuild.sh - build job for an external project
+* workdir/hkexsh_pushbuild.sh - build job for an example external project
 
-The second script above, workdir/hkexsh_pushbuild.sh, is triggered by either
-a git hook or a gogs.io webhook; the sample post-receive git hook script is
-also present within workdir/, but is active within the external git repo
-rather than being part of the gofish configuration itself.
+The second script above, workdir/hkexsh_pushbuild.sh, is intended to be triggered by either a git hook or a gogs.io webhook; the sample post-receive git hook script is also present within workdir/, but is active within the external git repo rather than being part of the gofish configuration itself.
 
 In summary, to perform build/CI tasks with gofish, one should
 
@@ -49,6 +41,8 @@ In summary, to perform build/CI tasks with gofish, one should
 * TODO: Add cmdline option to specify location of run.log (currently gofish launch dir)
 
 ## Example Run
+Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as gofish itself)
+
 [terminal A - CI server]
 ```
 $ cd go/src/blitter.com/go/gofish
