@@ -257,6 +257,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmdMap map[string]string) {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 		func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(fmt.Sprintf("Triggered %s", tag)))
 			go func() {
 				//log.Printf("URL params:%+v\n", r.URL.Query())
 				//if r.URL.Query()["p1"] != nil {
@@ -363,7 +364,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
 							fmt.Fprintf(workerOutputFile, "[f %03d]", int8(exitStatus))
 							//log.Print(c.Stderr /*stdErrBuffer*/)
-							log.Printf("Exit Status: %d\n", int32(exitStatus)) //#
+							log.Printf("%s[Exit Status: %d\n", indentStr, int32(exitStatus)) //#
 						}
 					} else {
 						// exec.Cmd automatically closes its files on exit, so we need to
