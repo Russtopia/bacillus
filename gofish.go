@@ -269,7 +269,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					cmdArgs = cmdStrList[1:]
 				}
 				cmdCancelCtx, cmdCancelFunc := context.WithCancel(mainCtx)
-				_ = cmdCancelFunc // TODO: call if user cancels job
+				defer cmdCancelFunc()
 				c := exec.CommandContext(cmdCancelCtx, cmdStrList[0], cmdArgs...)
 				//c.Dir = execRoot
 
