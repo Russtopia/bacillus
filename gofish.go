@@ -32,6 +32,8 @@ var (
 	attachStdout    bool
 	jobHomeDir      string
 	runLogTailLines int
+
+	jobCancellers map[string]func()
 )
 
 func getRefreshJS(stat rune) string {
@@ -326,13 +328,25 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 						log.Printf("%s[ERROR on event %s trigger.]\n", indentStr,
 							tag)
 					} else {
+						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("%s[event %s{%s} triggered. (workDir %s)]\n", indentStr,
+						log.Printf("%s<a href='/cancel/%s'>[C]</a>[event %s{%s} triggered. (workDir %s)]\n", indentStr,
+							jobID,
 							tag, jobID, workDir)
 						log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
 							workerOutputRelPath, workerOutputRelPath)
+
+						// Spawn handler for /cancel/<jobID>
+						http.HandleFunc(fmt.Sprintf("/cancel/%s", jobID),
+							func(w http.ResponseWriter, r *http.Request) {
+								jobCancellers[jobID]()
+								//delete(jobCancellers, jobID)
+								w.Write([]byte(fmt.Sprintf("Cancelled %s", jobID)))
+							})
 					}
 					werr := c.Wait()
+					//jobCancellers[jobID]()
+					delete(jobCancellers, jobID)
 
 					if werr, ok := werr.(*exec.ExitError); ok {
 						// The program has exited with an exit code != 0
@@ -349,7 +363,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
 							fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
 							//log.Print(c.Stderr /*stdErrBuffer*/)
-							log.Printf("Exit Status: %d\n", exitStatus) //#
+							log.Printf("Exit Status: %d\n", int32(exitStatus)) //#
 						}
 					} else {
 						// exec.Cmd automatically closes its files on exit, so we need to
@@ -387,6 +401,7 @@ func main() {
 	flag.Parse()
 
 	mainCtx := context.Background()
+	jobCancellers = make(map[string]func())
 
 	logfile, _ := os.Create("run.log")
 	log.SetOutput(logfile)
