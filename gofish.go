@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -25,11 +26,12 @@ const (
 )
 
 var (
-	addrPort     string
-	hookStd      string
-	apiKey       string
-	attachStdout bool
-	jobHomeDir   string
+	addrPort        string
+	hookStd         string
+	apiKey          string
+	attachStdout    bool
+	jobHomeDir      string
+	runLogTailLines int
 )
 
 func getRefreshJS(stat rune) string {
@@ -250,7 +252,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 `)
 }
 
-func launchJobListener(tag string, jobEnv []string, cmdMap map[string]string) {
+func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmdMap map[string]string) {
 	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 		func(w http.ResponseWriter, r *http.Request) {
 			go func() {
@@ -263,7 +265,9 @@ func launchJobListener(tag string, jobEnv []string, cmdMap map[string]string) {
 				if len(cmdStrList) > 1 {
 					cmdArgs = cmdStrList[1:]
 				}
-				c := exec.Command(cmdStrList[0], cmdArgs...)
+				cmdCancelCtx, cmdCancelFunc := context.WithCancel(mainCtx)
+				_ = cmdCancelFunc // TODO: call if user cancels job
+				c := exec.CommandContext(cmdCancelCtx, cmdStrList[0], cmdArgs...)
 				//c.Dir = execRoot
 
 				// if jobHomeDir is set, set execution dir to
@@ -378,8 +382,11 @@ func main() {
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
+	flag.IntVar(&runLogTailLines, "rl", 32, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.Parse()
+
+	mainCtx := context.Background()
 
 	logfile, _ := os.Create("run.log")
 	log.SetOutput(logfile)
@@ -399,28 +406,28 @@ func main() {
 				</head>
 				<body>
 				`)
-		
+
 		rl, _ := ioutil.ReadFile("run.log")
-		
-		// Split log into header (registered endpoints persisting at top)
-		// and events below, so as log gets long the endpoints
-		// still appear at the top.
+
+		// Split log into header and the rest, with endpoints
+		// at top and events below, so as log gets longer user
+		// can still see important bits.
 		lines := strings.Split(string(rl), "--GOFISH READY--")
 		tailLines := strings.Split(lines[1], "\n")
 		tailCount := len(tailLines)
-		
+
 		io.WriteString(w, "<pre style='background-color: skyblue;'>")
-		io.WriteString(w, lines[0] + "...")
+		io.WriteString(w, lines[0]+"...")
 		io.WriteString(w, "</pre>")
-		
+
 		io.WriteString(w, "<pre>")
-		if tailCount < 32 {
+		if runLogTailLines == 0 || tailCount < runLogTailLines {
 			io.WriteString(w, strings.Join(tailLines, "\n"))
 		} else {
-			io.WriteString(w, strings.Join(tailLines[tailCount-32:], "\n"))
+			io.WriteString(w, strings.Join(tailLines[tailCount-runLogTailLines:], "\n"))
 		}
-
 		io.WriteString(w, "</pre>")
+		//
 
 		io.WriteString(w, `
 				</body>
@@ -450,9 +457,11 @@ func main() {
 		// Note presently only 'blind' hookStd is supported
 		// (ie., if webhook request contains POST JSON data,
 		// it isn't read).
-		log.Printf("<a href='%s/%s'>[&gt;]</a>Registering handler for %s/%s [action %s]...\n",
-			hookStd, tag, hookStd, tag, cmd)
-		launchJobListener(tag, jobEnv, cmdMap)
+		if len(tag) > 0 {
+			log.Printf("<a href='%s/%s'>[&gt;]</a>Registering handler for %s/%s [action %s]...\n",
+				hookStd, tag, hookStd, tag, cmd)
+			launchJobListener(mainCtx, tag, jobEnv, cmdMap)
+		}
 	}
 	log.Printf("--GOFISH READY--\n")
 
