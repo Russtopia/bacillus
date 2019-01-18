@@ -82,7 +82,7 @@ appendSpinner = function() {
 }
 
 func getStyleCSS() string {
-		return `
+	return `
   <style>
     #spinner {
       position: fixed;
@@ -131,7 +131,7 @@ func getStyleCSS() string {
 }
 
 func getCompatJS() string {
-		return `
+	return `
     <script>
     bodyOrHtml = function() {
       if ('scrollingElement' in document) {
@@ -223,11 +223,11 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 <html>
 <head>
-` + getRefreshJS(stat) +
-		getStyleCSS() +
-		getCompatJS() +
-		getSpinnerJS(stat, codeColor, statWord) +
-`
+`+getRefreshJS(stat)+
+		getStyleCSS()+
+		getCompatJS()+
+		getSpinnerJS(stat, codeColor, statWord)+
+		`
   <script>
     window.onload = function() {
       appendSpinner();
@@ -399,9 +399,27 @@ func main() {
 				</head>
 				<body>
 				`)
-		io.WriteString(w, "<pre>")
+		
 		rl, _ := ioutil.ReadFile("run.log")
-		w.Write(rl)
+		
+		// Split log into header (registered endpoints persisting at top)
+		// and events below, so as log gets long the endpoints
+		// still appear at the top.
+		lines := strings.Split(string(rl), "--GOFISH READY--")
+		tailLines := strings.Split(lines[1], "\n")
+		tailCount := len(tailLines)
+		
+		io.WriteString(w, "<pre style='background-color: skyblue;'>")
+		io.WriteString(w, lines[0] + "...")
+		io.WriteString(w, "</pre>")
+		
+		io.WriteString(w, "<pre>")
+		if tailCount < 32 {
+			io.WriteString(w, strings.Join(tailLines, "\n"))
+		} else {
+			io.WriteString(w, strings.Join(tailLines[tailCount-32:], "\n"))
+		}
+
 		io.WriteString(w, "</pre>")
 
 		io.WriteString(w, `
@@ -432,9 +450,11 @@ func main() {
 		// Note presently only 'blind' hookStd is supported
 		// (ie., if webhook request contains POST JSON data,
 		// it isn't read).
-		log.Printf("Registering handler for %s/%s [action %s]...\n", hookStd, tag, cmd)
+		log.Printf("<a href='%s/%s'>[&gt;]</a>Registering handler for %s/%s [action %s]...\n",
+			hookStd, tag, hookStd, tag, cmd)
 		launchJobListener(tag, jobEnv, cmdMap)
 	}
+	log.Printf("--GOFISH READY--\n")
 
 	// A single endpoint handles the 'live' job output
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
