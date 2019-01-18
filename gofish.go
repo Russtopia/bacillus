@@ -42,7 +42,7 @@ func getRefreshJS(stat rune) string {
 
 func getSpinnerJS(stat rune, codeColor, statWord string) string {
 	if stat == 'r' {
-		return `
+		return `<script>
 ////////////////////////
 appendSpinner = function() {
   var spinners = [
@@ -66,9 +66,9 @@ appendSpinner = function() {
   })(spinner,el);
 }
 ////////////////////////
-`
+</script>`
 	} else {
-		return `
+		return `<script>
 		////////////////////////
 appendSpinner = function() {
   var el = document.createElement('div');
@@ -77,8 +77,79 @@ appendSpinner = function() {
   document.body.appendChild(el);
 }
 ////////////////////////
-`
+</script>`
 	}
+}
+
+func getStyleCSS() string {
+		return `
+  <style>
+    #spinner {
+      position: fixed;
+      right: 1em; bottom: 1.5em;
+      font-family: monospace;
+      margin: 1em;
+      padding: 0.2em;
+      font-size: 1.5em;
+      font-weight: normal; //bold;
+      background: skyblue;
+      border: dotted 2px;
+      border-radius: 1em;
+    }
+	
+    #finOKMarker {
+      position: fixed;
+      right: 1em; bottom: 1.5em;
+      font-family: monospace;
+      margin: 1em;
+      padding: 0.2em;
+      font-size: 1.5em;
+      font-weight: normal;
+      background: lightgreen;
+      border: dotted 2px;
+      border-radius: 1em;
+    }
+	
+    #finErrMarker {
+      position: fixed;
+      right: 1em; bottom: 1.5em;
+      font-family: monospace;
+      margin: 1em;
+      padding: 0.2em;
+      font-size: 1.5em;
+      font-weight: bold;
+      background: red;
+      border: dotted 2px;
+      border-radius: 1em;
+    }
+	
+    //#stat {
+    //  display: none;
+    //}
+  </style>
+  `
+}
+
+func getCompatJS() string {
+		return `
+    <script>
+    bodyOrHtml = function() {
+      if ('scrollingElement' in document) {
+        return document.scrollingElement;
+      }
+      // Fallback for legacy browsers
+      if (navigator.user-Agent.indexOf('WebKit') != -1) {
+        return document.body;
+      }
+      return document.documentElement;
+    }
+    scrollDown = function() {
+      setTimeout (function () {
+        bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
+      }, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
+    }
+    </script>
+	`
 }
 
 // TODO: types for matching JSON events of
@@ -138,8 +209,6 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		consoleLog = []byte(strings.Join(tail, "\n"))
 	}
 
-	var refreshStr string
-	var spinnerCode string
 	var codeColor string
 	var statWord string
 	if code != 0 {
@@ -150,76 +219,16 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		statWord = "Done"
 	}
 
-	refreshStr = getRefreshJS(stat)
-	spinnerCode = getSpinnerJS(stat, codeColor, statWord)
-
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
 <html>
 <head>
-`+refreshStr+`
-  <style>
-    #spinner {
-      position: fixed;
-      right: 1em; bottom: 1.5em;
-      font-family: monospace;
-      margin: 1em;
-      padding: 0.2em;
-      font-size: 1.5em;
-      font-weight: normal; //bold;
-      background: skyblue;
-      border: dotted 2px;
-      border-radius: 1em;
-    }
-	
-    #finOKMarker {
-      position: fixed;
-      right: 1em; bottom: 1.5em;
-      font-family: monospace;
-      margin: 1em;
-      padding: 0.2em;
-      font-size: 1.5em;
-      font-weight: normal;
-      background: lightgreen;
-      border: dotted 2px;
-      border-radius: 1em;
-    }
-	
-    #finErrMarker {
-      position: fixed;
-      right: 1em; bottom: 1.5em;
-      font-family: monospace;
-      margin: 1em;
-      padding: 0.2em;
-      font-size: 1.5em;
-      font-weight: bold;
-      background: red;
-      border: dotted 2px;
-      border-radius: 1em;
-    }
-	
-    //#stat {
-    //  display: none;
-    //}
-  </style>
-
+` + getRefreshJS(stat) +
+		getStyleCSS() +
+		getCompatJS() +
+		getSpinnerJS(stat, codeColor, statWord) +
+`
   <script>
-    bodyOrHtml = function() {
-      if ('scrollingElement' in document) {
-        return document.scrollingElement;
-      }
-      // Fallback for legacy browsers
-      if (navigator.user-Agent.indexOf('WebKit') != -1) {
-        return document.body;
-      }
-      return document.documentElement;
-    }
-    scrollDown = function() {
-      setTimeout (function () {
-        bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
-      }, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
-    }
-`+spinnerCode+`
     window.onload = function() {
       appendSpinner();
       scrollDown(); //scrollTo(0,0);
