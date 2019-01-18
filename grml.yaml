@@ -34,7 +34,7 @@ commands:
     deps:
       - app
     exec: |
-      echo "TODO: call go-callvis here, outputting to ${docDir}"
+      echo "calling go-callvis to generate diagram"
       go-callvis -file gofish-vis -format png -ignore bytes,errors,flag,fmt,internal,io,log,net,os,path,runtime,time,strings,sync,syscall,binary,encoding -group pkg,type .
       ./fixup-gv.sh gofish.go && cat gofish-vis.gv | dot -Tpng -ogofish-vis-fixedup.png
 
@@ -45,4 +45,4 @@ commands:
       go clean .
       gofmt -w .
       go build .
-      echo "TODO: program output to ${buildDir}"
+      #echo "TODO: program output to ${buildDir}"

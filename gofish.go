@@ -21,7 +21,7 @@ import (
 
 const (
 	appVer string = "v0.1"
-	defKey string = "IAmABanana"
+	defKey string = "IAmABanana" //TODO: rudimentary API guarding
 )
 
 var (
@@ -32,8 +32,60 @@ var (
 	jobHomeDir   string
 )
 
+func getRefreshJS(stat rune) string {
+	if stat == 'r' {
+		return `<meta http-equiv="refresh" content="5">`
+	} else {
+		return ``
+	}
+}
+
+func getSpinnerJS(stat rune, codeColor, statWord string) string {
+	if stat == 'r' {
+		return `
+////////////////////////
+appendSpinner = function() {
+  var spinners = [
+    "|/-\\",
+    ".oO@*",
+    [">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
+  ];
+
+  var el = document.createElement('div');
+  el.setAttribute('id', 'spinner');
+  document.body.appendChild(el);
+  el.innerHTML = '.';
+  var spinner = spinners[0];
+  
+  (function(spinner,el) {
+    var i = 0;
+    setInterval(function() {
+      el.innerHTML = spinner[i];
+      i = (i + 1) % spinner.length;
+    }, 300);
+  })(spinner,el);
+}
+////////////////////////
+`
+	} else {
+		return `
+		////////////////////////
+appendSpinner = function() {
+  var el = document.createElement('div');
+  el.setAttribute('id', '` + codeColor + `');
+  el.innerHTML = '` + statWord + `';
+  document.body.appendChild(el);
+}
+////////////////////////
+`
+	}
+}
+
 // TODO: types for matching JSON events of
 // supported webhooks: gogs.io, github, gitlab, ... ?
+// For now, the 'blind' endpoint is the only one supported,
+// meaning the request can't communicate any extra data to the
+// job invocation in a GET or POST request.
 
 func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
 	consoleLog, e := ioutil.ReadFile(strings.Replace(fmt.Sprintf("%s", r.URL)[1:], "/fullconsole", "", 1))
@@ -98,119 +150,84 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		statWord = "Done"
 	}
 
-	if stat == 'r' {
-		refreshStr = `<meta http-equiv="refresh" content="5">`
-		spinnerCode = `appendSpinner = function() {
-					var spinners = [
-						"|/-\\",
-						".oO@*",
-						[">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
-					];
-
-					var el = document.createElement('div');
-					el.setAttribute('id', 'spinner');
-					document.body.appendChild(el);
-					el.innerHTML = '.';
-					var spinner = spinners[0];
-					
-					(function(spinner,el) {
-					  var i = 0;
-					  setInterval(function() {
-						el.innerHTML = spinner[i];
-						i = (i + 1) % spinner.length;
-					  }, 300);
-					})(spinner,el);
-				  }
-`
-	} else {
-		refreshStr = ``
-		spinnerCode = `appendSpinner = function() {
-					var el = document.createElement('div');
-					el.setAttribute('id', '` + codeColor + `');
-					el.innerHTML = '` + statWord + `';
-					document.body.appendChild(el);
-					}
-					`
-	}
+	refreshStr = getRefreshJS(stat)
+	spinnerCode = getSpinnerJS(stat, codeColor, statWord)
 
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
-				<html>
-				<head>
-				`+refreshStr+`
-				<style>
-				  #spinner {
-				    position: fixed;
-					right: 1em; bottom: 1em;
-					font-family: monospace;
-					margin: 1em;
-					padding: 0.2em;
-					font-size: 1.5em;
-					font-weight: normal; //bold;
-					background: skyblue;
-					border: dotted 2px;
-					border-radius: 1em;
-				  }
-				  
-				  #finOKMarker {
-						  position: fixed;
-						  right: 1em; bottom: 1em;
-						  font-family: monospace;
-						  margin: 1em;
-						  padding: 0.2em;
-						  font-size: 1.5em;
-						  font-weight: normal;
-						  background: lightgreen;
-						  border: dotted 2px;
-						  border-radius: 1em;
-				  }
-				  
-				  #finErrMarker {
-						  position: fixed;
-						  right: 1em; bottom: 1em;
-						  font-family: monospace;
-						  margin: 1em;
-						  padding: 0.2em;
-						  font-size: 1.5em;
-						  font-weight: bold;
-						  background: red;
-						  border: dotted 2px;
-						  border-radius: 1em;
-				  }
-				  
-				  //#stat {
-					//display: none;
-				  //}
-				</style>
+<html>
+<head>
+`+refreshStr+`
+  <style>
+    #spinner {
+      position: fixed;
+      right: 1em; bottom: 1.5em;
+      font-family: monospace;
+      margin: 1em;
+      padding: 0.2em;
+      font-size: 1.5em;
+      font-weight: normal; //bold;
+      background: skyblue;
+      border: dotted 2px;
+      border-radius: 1em;
+    }
+	
+    #finOKMarker {
+      position: fixed;
+      right: 1em; bottom: 1.5em;
+      font-family: monospace;
+      margin: 1em;
+      padding: 0.2em;
+      font-size: 1.5em;
+      font-weight: normal;
+      background: lightgreen;
+      border: dotted 2px;
+      border-radius: 1em;
+    }
+	
+    #finErrMarker {
+      position: fixed;
+      right: 1em; bottom: 1.5em;
+      font-family: monospace;
+      margin: 1em;
+      padding: 0.2em;
+      font-size: 1.5em;
+      font-weight: bold;
+      background: red;
+      border: dotted 2px;
+      border-radius: 1em;
+    }
+	
+    //#stat {
+    //  display: none;
+    //}
+  </style>
 
-				<script>
-				  bodyOrHtml = function() {
-				    if ('scrollingElement' in document) {
-					  return document.scrollingElement;
-			  		}
-					// Fallback for legacy browsers
-					if (navigator.user-Agent.indexOf('WebKit') != -1) {
-					  return document.body;
-			  		}
-					return document.documentElement;
-				  }
-
-				  scrollDown = function() {
-					setTimeout (function () {
-					  bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
-	  				}, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
-				  }
+  <script>
+    bodyOrHtml = function() {
+      if ('scrollingElement' in document) {
+        return document.scrollingElement;
+      }
+      // Fallback for legacy browsers
+      if (navigator.user-Agent.indexOf('WebKit') != -1) {
+        return document.body;
+      }
+      return document.documentElement;
+    }
+    scrollDown = function() {
+      setTimeout (function () {
+        bodyOrHtml().scrollTop = bodyOrHtml().scrollHeight;
+      }, 5); // hack: delay due to most browsers' auto-scroll reset on page reload
+    }
 `+spinnerCode+`
-
-				  window.onload = function() {
-					appendSpinner();
-					scrollDown(); //scrollTo(0,0);
-				  }
-				</script>
-
-				</head>
-				<body>
-				`)
+    window.onload = function() {
+      appendSpinner();
+      scrollDown(); //scrollTo(0,0);
+    }
+  </script>
+</head>
+<body>
+`)
 
 	io.WriteString(w, "<pre>")
 	w.Write(consoleLog)
@@ -219,13 +236,133 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte(fmt.Sprintln(r.URL)))
 	io.WriteString(w, `
-				</body>
-				</html>
-				`)
-	//} else {
-	//	w.WriteHeader(http.StatusNotFound)
-	//	fmt.Fprint(w, "404 - Page Not Found")
-	//}
+</body>
+</html>
+`)
+}
+
+func launchJobListener(tag string, jobEnv []string, cmdMap map[string]string) {
+	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
+		func(w http.ResponseWriter, r *http.Request) {
+			go func() {
+				//log.Printf("URL params:%+v\n", r.URL.Query())
+				//if r.URL.Query()["p1"] != nil {
+				//	log.Printf("p1:%s", r.URL.Query()["p1"][0])
+				//}
+				cmdStrList := strings.Split(cmdMap[tag], " ")
+				cmdArgs := []string{""}
+				if len(cmdStrList) > 1 {
+					cmdArgs = cmdStrList[1:]
+				}
+				c := exec.Command(cmdStrList[0], cmdArgs...)
+				//c.Dir = execRoot
+
+				// if jobHomeDir is set, set execution dir to
+				// it and let user define whether or not to persist
+				// WORKDIR via the GOFISH_WORKDIR env var.
+				c.Dir, _ = filepath.Abs(jobHomeDir)
+
+				//var terr error
+				//var workDir string
+				workDir, terr := ioutil.TempDir(c.Dir, "gofish_")
+				jobID := strings.Split(workDir, "_")[1]
+				indent, _ := strconv.ParseInt(jobID, 10, 64)
+				indentStr := strings.Repeat("-", int(indent%8)+1)
+				log.Printf("%s[webhook %s{%s}: %s]\n", indentStr,
+					tag, jobID, cmdMap[tag])
+				if terr != nil {
+					log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
+				} else {
+					var workerOutputPath string
+					var workerOutputFile *os.File
+					consoleFName := "console.out"
+					workerOutputPath = workDir + "/" + consoleFName
+					workerOutputRelPath := fmt.Sprintf("%s/gofish_%s/%s", jobHomeDir, jobID, consoleFName)
+					if attachStdout {
+						c.Stdout = os.Stdout
+						c.Stderr = os.Stderr
+					} else {
+						workerOutputFile, _ = os.Create(workerOutputPath)
+						c.Stdout = workerOutputFile
+						c.Stderr = workerOutputFile
+					}
+
+					c.Env = append(c.Env, fmt.Sprintf("USER=%s", os.Getenv("USER")))
+					c.Env = append(c.Env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
+					c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBID=%s", jobID))
+					c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBTAG=%s", tag))
+					c.Env = append(c.Env, fmt.Sprintf("GOFISH_WORKDIR=%s", workDir))
+					c.Env = append(c.Env, jobEnv...)
+
+					// Job output status is encoded in first line of output log.
+					// [1 2]
+					//  1: state: r = running f = finished
+					//  2: completion status: <n> = exit status, 0 = success; else failure
+					//     status uses UNIX shell exit status convention (base 10 0-255))
+					_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
+					_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					cerr := c.Start()
+					if cerr != nil {
+						log.Printf("[exec.Cmd: %+v]\n", c)
+						w.WriteHeader(500)
+						w.Write([]byte("ERR"))
+						log.Printf("%s[ERROR on event %s trigger.]\n", indentStr,
+							tag)
+					} else {
+						w.Write([]byte("OK"))
+						log.Printf("%s[event %s{%s} triggered. (workDir %s)]\n", indentStr,
+							tag, jobID, workDir)
+						log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
+							workerOutputRelPath, workerOutputRelPath)
+					}
+					werr := c.Wait()
+
+					if werr, ok := werr.(*exec.ExitError); ok {
+						// The program has exited with an exit code != 0
+
+						// This works on both Unix and Windows. Although package
+						// syscall is generally platform dependent, WaitStatus is
+						// defined for both Unix and Windows and in both cases has
+						// an ExitStatus() method with the same signature.
+						var exitStatus uint32
+						if status, ok := werr.Sys().(syscall.WaitStatus); ok {
+							exitStatus = uint32(status.ExitStatus())
+							// exec.Cmd automatically closes its files on exit, so we need to
+							// reopen here to write the status at offset 0
+							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
+							fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
+							//log.Print(c.Stderr /*stdErrBuffer*/)
+							log.Printf("Exit Status: %d\n", exitStatus) //#
+						}
+					} else {
+						// exec.Cmd automatically closes its files on exit, so we need to
+						// reopen here to write the status at offset 0
+						workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
+						fmt.Fprintf(workerOutputFile, "[f %03d]", 0)
+						//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
+					}
+
+					// TODO: exitStatus output to.. job.status ? (int exitStatus)
+					// TODO: console log endpoint check for existence of job.status;
+
+					if werr == nil {
+						log.Printf("%s[webhook %s{%s} completed with status 0]\n", indentStr,
+							tag, jobID)
+					} else {
+						log.Printf("%s[webhook <a href=\"%s\">%s{%s}</a> completed with error %s]\n", indentStr,
+							workerOutputRelPath, tag, jobID, werr)
+					}
+					if strings.Contains(strings.Join(c.Env, " "),
+						"GOFISH_REMOVE_WORKDIR") {
+						_ = os.RemoveAll(workDir)
+					}
+				}
+			}()
+		})
 }
 
 func main() {
@@ -265,6 +402,9 @@ func main() {
 	})
 
 	jobHomeDir = "workdir"
+	// Each non-switch argument is taken to be an endpoint (job) descriptor
+	// Syntax of an endpoint:
+	//  endpoint:jobDir:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
 	for _, e := range flag.Args() {
 		fields := strings.Split(e, ":")
 		tag := fields[0]
@@ -278,131 +418,18 @@ func main() {
 		}
 
 		cmdMap[tag] = cmd
+
+		// Launch webhook listeners for each defined endpoint
+		// Note presently only 'blind' hookStd is supported
+		// (ie., if webhook request contains POST JSON data,
+		// it isn't read).
 		log.Printf("Registering handler for %s/%s [action %s]...\n", hookStd, tag, cmd)
-		http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
-			func(w http.ResponseWriter, r *http.Request) {
-				go func() {
-					//log.Printf("URL params:%+v\n", r.URL.Query())
-					//if r.URL.Query()["p1"] != nil {
-					//	log.Printf("p1:%s", r.URL.Query()["p1"][0])
-					//}
-					cmdStrList := strings.Split(cmdMap[tag], " ")
-					cmdArgs := []string{""}
-					if len(cmdStrList) > 1 {
-						cmdArgs = cmdStrList[1:]
-					}
-					c := exec.Command(cmdStrList[0], cmdArgs...)
-					//c.Dir = execRoot
-
-					// if jobHomeDir is set, set execution dir to
-					// it and let user define whether or not to persist
-					// WORKDIR via the GOFISH_WORKDIR env var.
-					c.Dir, _ = filepath.Abs(jobHomeDir)
-
-					//var terr error
-					//var workDir string
-					workDir, terr := ioutil.TempDir(c.Dir, "gofish_")
-					jobID := strings.Split(workDir, "_")[1]
-					indent, _ := strconv.ParseInt(jobID, 10, 64)
-					indentStr := strings.Repeat("-", int(indent%8)+1)
-					log.Printf("%s[webhook %s{%s}: %s]\n", indentStr,
-						tag, jobID, cmdMap[tag])
-					if terr != nil {
-						log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
-					} else {
-						var workerOutputPath string
-						var workerOutputFile *os.File
-						consoleFName := "console.out"
-						workerOutputPath = workDir + "/" + consoleFName
-						workerOutputRelPath := fmt.Sprintf("%s/gofish_%s/%s", jobHomeDir, jobID, consoleFName)
-						if attachStdout {
-							c.Stdout = os.Stdout
-							c.Stderr = os.Stderr
-						} else {
-							workerOutputFile, _ = os.Create(workerOutputPath)
-							c.Stdout = workerOutputFile
-							c.Stderr = workerOutputFile
-						}
-
-						c.Env = append(c.Env, fmt.Sprintf("USER=%s", os.Getenv("USER")))
-						c.Env = append(c.Env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
-						c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBID=%s", jobID))
-						c.Env = append(c.Env, fmt.Sprintf("GOFISH_JOBTAG=%s", tag))
-						c.Env = append(c.Env, fmt.Sprintf("GOFISH_WORKDIR=%s", workDir))
-						c.Env = append(c.Env, jobEnv...)
-
-						// Job output status is encoded in first line of output log.
-						// [1 2]
-						//  1: state: r = running f = finished
-						//  2: completion status: <n> = exit status, 0 = success; else failure
-						//     status uses UNIX shell exit status convention (base 10 0-255))
-						_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
-						_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
-						if err != nil {
-							log.Fatal(err)
-						}
-
-						cerr := c.Start()
-						if cerr != nil {
-							log.Printf("[exec.Cmd: %+v]\n", c)
-							w.WriteHeader(500)
-							w.Write([]byte("ERR"))
-							log.Printf("%s[ERROR on event %s trigger.]\n", indentStr,
-								tag)
-						} else {
-							w.Write([]byte("OK"))
-							log.Printf("%s[event %s{%s} triggered. (workDir %s)]\n", indentStr,
-								tag, jobID, workDir)
-							log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
-								workerOutputRelPath, workerOutputRelPath)
-						}
-						werr := c.Wait()
-
-						if werr, ok := werr.(*exec.ExitError); ok {
-							// The program has exited with an exit code != 0
-
-							// This works on both Unix and Windows. Although package
-							// syscall is generally platform dependent, WaitStatus is
-							// defined for both Unix and Windows and in both cases has
-							// an ExitStatus() method with the same signature.
-							var exitStatus uint32
-							if status, ok := werr.Sys().(syscall.WaitStatus); ok {
-								exitStatus = uint32(status.ExitStatus())
-								// exec.Cmd automatically closes its files on exit, so we need to
-								// reopen here to write the status at offset 0
-								workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-								fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
-								//log.Print(c.Stderr /*stdErrBuffer*/)
-								log.Printf("Exit Status: %d\n", exitStatus) //#
-							}
-						} else {
-							// exec.Cmd automatically closes its files on exit, so we need to
-							// reopen here to write the status at offset 0
-							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-							fmt.Fprintf(workerOutputFile, "[f %03d]", 0)
-							//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
-						}
-
-						// TODO: exitStatus output to.. job.status ? (int exitStatus)
-						// TODO: console log endpoint check for existence of job.status;
-
-						if werr == nil {
-							log.Printf("%s[webhook %s{%s} completed with status 0]\n", indentStr,
-								tag, jobID)
-						} else {
-							log.Printf("%s[webhook <a href=\"%s\">%s{%s}</a> completed with error %s]\n", indentStr,
-								workerOutputRelPath, tag, jobID, werr)
-						}
-						if strings.Contains(strings.Join(c.Env, " "),
-							"GOFISH_REMOVE_WORKDIR") {
-							_ = os.RemoveAll(workDir)
-						}
-					}
-				}()
-			})
+		launchJobListener(tag, jobEnv, cmdMap)
 	}
 
+	// A single endpoint handles the 'live' job output
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
+	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
 
 	err := http.ListenAndServe(addrPort, nil)

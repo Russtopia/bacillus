@@ -33,5 +33,6 @@ if [ $(( ${GOFISH_JOBID#0} % 2 )) -eq 0 ]; then
   exit 0
 else
   echo "FAILED!"
+  echo "(Not really, just simulating due to odd-numbered GOFISH_JOBID:$GOFISH_JOBID)"
   exit 252
 fi
