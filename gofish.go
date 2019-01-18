@@ -361,7 +361,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 							// exec.Cmd automatically closes its files on exit, so we need to
 							// reopen here to write the status at offset 0
 							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-							fmt.Fprintf(workerOutputFile, "[f %03d]", exitStatus)
+							fmt.Fprintf(workerOutputFile, "[f %03d]", int8(exitStatus))
 							//log.Print(c.Stderr /*stdErrBuffer*/)
 							log.Printf("Exit Status: %d\n", int32(exitStatus)) //#
 						}
