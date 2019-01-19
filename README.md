@@ -1,7 +1,7 @@
-# gofish - A minimalist Build Automation/CI service
+# bacillus - A minimalist Build Automation/CI service
 
 
-gofish listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from git commit hooks, or anything else one can think of.
+bacillus listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from git commit hooks, or anything else one can think of.
 
 
 ## Rationale
@@ -12,7 +12,7 @@ frameworks, containers, etc.
 
 Existing automated build/CI systems such as Jenkins, buildbot, concourse,
 and so on are large and/or difficult to set up, and have many external dependencies.
-gofish is a single static binary with almost zero external configuration.
+bacillus is a single static binary with almost zero external configuration.
 
 ### Building and Installing
 
@@ -20,32 +20,32 @@ $ go install .
 
 ## Configuration
 
-gofish, being a simple tool, has little configuration. The repository contains
+bacillus, being a simple tool, has little configuration. The repository contains
 two sample scripts:
 
-* example.sh - launch gofish with a few demo endpoints
+* example.sh - launch bacillus with a few demo endpoints
 * workdir/hkexsh_pushbuild.sh - build job for an example external project
 
-The second script above, workdir/hkexsh_pushbuild.sh, is intended to be triggered by either a git hook or a webhook such as those provided by repo managers such as gogs.io. The sample post-receive git hook script in workdir/ is meant to be placed within the external project's git repo, and as such is not technically part of the gofish configuration itself.
+The second script above, workdir/hkexsh_pushbuild.sh, is intended to be triggered by either a git hook or a webhook such as those provided by repo managers such as gogs.io. The sample post-receive git hook script in workdir/ is meant to be placed within the external project's git repo, and as such is not technically part of the bacillus configuration itself.
 
-In summary, to perform build/CI tasks with gofish, one should
+In summary, to perform build/CI tasks with bacillus, one should
 
 * add a git/web hook to external git repositories and/or git repo web servers
-* add job scripts to perform the intended tasks to some location known to gofish
+* add job scripts to perform the intended tasks to some location known to bacillus
 * define endpoints, job workdir and job-specific env vars for each to pass
-  to gofish (see example.sh)
+  to bacillus (see example.sh)
 
 ## TODOs
-* TODO: Add cmdline option to specify location of run.log (currently gofish launch dir)
+* TODO: Add cmdline option to specify location of run.log (currently bacillus launch dir)
 * Screenshots
 * Add a /jobstatus endpoint, showing a single-line status summary of all recent jobs w/status indicators (ie., brief version of /runlog and with only running and recently-completed jobs; or make /runlog do this and add a _full_log_ link at top to see complete logs)
 
 ## Example Run
-Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as gofish itself)
+Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacillus itself)
 
 [terminal A - CI server]
 ```
-$ cd go/src/blitter.com/go/gofish
+$ cd go/src/blitter.com/go/bacillus
 $ go install . && ./example.sh
 ```
 

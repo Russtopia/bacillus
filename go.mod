@@ -1,1 +1,1 @@
-module blitter.com/go/gofish
+module blitter.com/go/bacillus

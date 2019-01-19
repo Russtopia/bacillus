@@ -1,17 +1,17 @@
 #!/bin/bash
 
 ##
-## Example gofish launch script to trigger
+## Example bacillus launch script to trigger
 ## work on a few demonstration webhook endpoints.
 ##
 ## Syntax of an endpoint:
 ##  endpoint:jobDir:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
 ##
-## gofish launches each worker within its own start location (eg., if one
-## starts gofish within /opt/gofish/, each worker starts off there),
-## but creates a per-job unique dir beneath _jobDir_ named gofish_<nnnn>
-## and sets GOFISH_WORKDIR to this path for use by the worker.
-## Each endpoint script should use GOFISH_WORKDIR to do its work and not
+## bacillus launches each worker within its own start location (eg., if one
+## starts bacillus within /opt/bacillus/, each worker starts off there),
+## but creates a per-job unique dir beneath _jobDir_ named bacillus_<nnnn>
+## and sets BACILLUS_WORKDIR to this path for use by the worker.
+## Each endpoint script should use BACILLUS_WORKDIR to do its work and not
 ## pollute other filesystem locations.
 ##
 ## Following the _jobDir_ field is a comma-delimited list of zero or more
@@ -30,19 +30,19 @@
 ##
 ## onPush_hkexsh_build:
 ##   -build Go hkexsh project within workdir/, artifacts will
-##    be in $GOFISH_WORKDIR (gofish_<nnnn>)
+##    be in $BACILLUS_WORKDIR (bacillus_<nnnn>)
 ##    job script is workdir/hkexsh_pushbuild.sh
 ##
-## onPush_gofish_env:
+## onPush_bacillus_env:
 ##   -Output the job's shell environment, calling 'env' via bash
 ##
-## gofish will log worker activity to run.log in the current directory
-## (wherever gofish was launched from).
+## bacillus will log worker activity to run.log in the current directory
+## (wherever bacillus was launched from).
 ## TODO: allow specifying location of run.log via an option
 
 ## Invoking each trigger using wget
 # $ wget 127.0.0.1:9990/blind/onPush_hkexsh_build
-# $ wget 127.0.0.1:9990/blind/onPush_gofish_nop
+# $ wget 127.0.0.1:9990/blind/onPush_bacillus_nop
 
 ## Invoking via curl (in future this is required for any hook type
 ## beyond 'blind', as github, gitlab, gogs.io etc. send JSON via POST)
@@ -55,6 +55,6 @@ if [ -e run.log ]; then
   mv -f run.log run.log.bak
 fi
 
-gofish "${OPTS}" \
+bacillus "${OPTS}" \
  onPush_hkexsh_build:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
- onPush_gofish_env:GOFISH_FOO=foo,GOFISH_BAR=bar:"/bin/bash -c env"
+ onPush_bacillus_env:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"/bin/bash -c env"

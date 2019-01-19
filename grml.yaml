@@ -1,5 +1,5 @@
 env:
-  project: gofish
+  project: bacillus
   version: 0.1.0
   buildDir: build/
   docDir: doc/
@@ -35,12 +35,12 @@ commands:
       - app
     exec: |
       echo "calling go-callvis to generate diagram"
-      go-callvis -file gofish-vis -format png -ignore bytes,errors,flag,fmt,internal,io,log,net,os,path,runtime,time,strings,sync,syscall,binary,encoding -group pkg,type .
-      ./fixup-gv.sh gofish.go && cat gofish-vis.gv | dot -Tpng -ogofish-vis-fixedup.png
+      go-callvis -file bacillus-vis -format png -ignore bytes,errors,flag,fmt,internal,io,log,net,os,path,runtime,time,strings,sync,syscall,binary,encoding -group pkg,type .
+      ./fixup-gv.sh bacillus.go && cat bacillus-vis.gv | dot -Tpng -obacillus-vis-fixedup.png
 
   app:
     aliases: [ build ]
-    help: build the gofish tool
+    help: build the bacillus tool
     exec: |
       go clean .
       gofmt -w .
