@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -30,6 +31,8 @@ var (
 	hookStd         string
 	apiKey          string
 	attachStdout    bool
+	indStyle        string
+	instCounter     uint32
 	jobHomeDir      string
 	runLogTailLines int
 
@@ -278,12 +281,46 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 				// WORKDIR via the BACILLUS_WORKDIR env var.
 				c.Dir, _ = filepath.Abs(jobHomeDir)
 
+				instColours := []string{
+					"floralwhite",
+					"burlywood",
+					"cadetblue",
+					"chocolate",
+					"coral",
+					"cornflowerblue",
+					"cornsilk",
+					"darkcyan",
+					"darkgoldenrod",
+					"darkgrey",
+					"darkkhaki",
+					"darkorange",
+					"darksalmon",
+					"darkseagreen",
+					"darkturquoise",
+					"gainsboro",
+					"gold",
+					"goldenrod"}
+
 				//var terr error
 				//var workDir string
+				var instColourIdx uint32
+				if indStyle == "colour" || indStyle == "both" {
+					instColourIdx = rand.Uint32() % uint32(len(instColours))
+					instCounter += 1
+				} else {
+					instColourIdx = 0
+				}
+				instColour := instColours[instColourIdx]
+
 				workDir, terr := ioutil.TempDir(c.Dir, "bacillus_")
 				jobID := strings.Split(workDir, "_")[1]
-				indent, _ := strconv.ParseInt(jobID, 10, 64)
-				indentStr := strings.Repeat("-", int(indent%8)+1)
+				var indent int64
+				var indentStr string
+				if indStyle == "indent" || indStyle == "both" {
+					indent, _ = strconv.ParseInt(jobID, 10, 64)
+					indentStr = strings.Repeat("-", int(indent%8)+1)
+				}
+
 				//log.Printf("%s[webhook  %s{%s}: %s]\n", indentStr,
 				//	tag, jobID, cmdMap[tag])
 				if terr != nil {
@@ -331,7 +368,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					} else {
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("%s<a href='/cancel/%s'>[C]</a>[event %s{<a href='%s'>%s</a>} triggered. (workDir %s)]\n", indentStr,
+						log.Printf("<span style='background-color:%s'>%s<a href='/cancel/%s'>[C]</a>[event %s{<a href='%s'>%s</a>} triggered. (workDir %s)]</span>\n", instColour, indentStr,
 							jobID,
 							tag,
 							workerOutputRelPath, jobID,
@@ -380,10 +417,10 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						log.Printf("%s[webhook  %s{<a href='%s'>%s</a>} completed with status 0]\n", indentStr,
+						log.Printf("<span style='background-color:%s'>%s[webhook  %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
 							tag, workerOutputRelPath, jobID)
 					} else {
-						log.Printf("%s[webhook  %s{<a href='%s'>%s</a>} completed with error %s]\n", indentStr,
+						log.Printf("<span style='background-color:%s'>%s[webhook  %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
 							tag, workerOutputRelPath, jobID, werr)
 					}
 					if strings.Contains(strings.Join(c.Env, " "),
@@ -399,6 +436,7 @@ func main() {
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
+	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 32, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.Parse()
