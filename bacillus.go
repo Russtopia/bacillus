@@ -551,7 +551,7 @@ func main() {
 	log.Printf("--BACILLUS READY--\n")
 
 	// Live runlog is just the tail of full runlog
-	http.HandleFunc("/fullrunlog", fullRunlogHandler)
+	http.HandleFunc("/fullrunlog/", fullRunlogHandler)
 
 	// A single endpoint handles the 'live' job output
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
