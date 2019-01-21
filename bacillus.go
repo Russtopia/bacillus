@@ -31,10 +31,15 @@ var (
 	hookStd         string
 	apiKey          string
 	attachStdout    bool
+	//statUseUnicode  bool
 	indStyle        string
 	instCounter     uint32
 	jobHomeDir      string
 	runLogTailLines int
+
+	//checkSeq string
+	//errSeq   string
+	//playSeq  string
 
 	jobCancellers map[string]func()
 )
@@ -164,6 +169,18 @@ func getCompatJS() string {
 // For now, the 'blind' endpoint is the only one supported,
 // meaning the request can't communicate any extra data to the
 // job invocation in a GET or POST request.
+
+func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
+	runLog, e := ioutil.ReadFile("run.log")
+	if e != nil {
+		w.Write([]byte(fmt.Sprintf("%s", e)))
+		return
+	}
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, "<html><head></head><body><pre>\n")
+	w.Write(runLog)
+	io.WriteString(w, "</pre></body</html>\n")
+}
 
 func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
 	consoleLog, e := ioutil.ReadFile(strings.Replace(fmt.Sprintf("%s", r.URL)[1:], "/fullconsole", "", 1))
@@ -417,10 +434,10 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						log.Printf("<span style='background-color:%s'>%s[webhook  %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s[&check;][event %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
 							tag, workerOutputRelPath, jobID)
 					} else {
-						log.Printf("<span style='background-color:%s'>%s[webhook  %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'>[!]</span>[event %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
 							tag, workerOutputRelPath, jobID, werr)
 					}
 					if strings.Contains(strings.Join(c.Env, " "),
@@ -439,6 +456,7 @@ func main() {
 	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 32, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
+	//flag.BoolVar(&statUseUnicode, "S", true, "set to false to use plain ASCII (ISO-8859-1) in /runlog")
 	flag.Parse()
 
 	mainCtx := context.Background()
@@ -452,13 +470,23 @@ func main() {
 
 	cmdMap := make(map[string]string)
 
-	log.Printf("Registering handler for /runlog page...\n")
+	log.Printf("Registering handler for /runlog page.\n")
 	http.HandleFunc("/runlog", func(w http.ResponseWriter, r *http.Request) {
+		//if statUseUnicode {
+		//	checkSeq = "o"
+		//	playSeq = string([]byte{'&','#'})
+		//	errSeq = "X"
+		//} else {
+		//	checkSeq = "o"
+		//	playSeq = ">"
+		//	errSeq = "X"
+		//}
+
 		w.Header().Set("Content-type", "text/html")
 		io.WriteString(w, `
 				<html>
 				<head>
-				<meta http-equiv="refresh" content="10">
+				<meta http-equiv="refresh" content="5">
 				</head>
 				<body>
 				`)
@@ -473,7 +501,7 @@ func main() {
 		tailCount := len(tailLines)
 
 		io.WriteString(w, "<pre style='background-color: skyblue;'>")
-		io.WriteString(w, lines[0]+"...")
+		io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
 		io.WriteString(w, "</pre>")
 
 		io.WriteString(w, "<pre>")
@@ -514,12 +542,16 @@ func main() {
 		// (ie., if webhook request contains POST JSON data,
 		// it isn't read).
 		if len(tag) > 0 {
-			log.Printf("<a href='%s/%s'>[&gt;]</a>Registering handler for %s/%s [action %s]...\n",
-				hookStd, tag, hookStd, tag, cmd)
+			log.Printf("<a href='%s/%s'>[&#9654;]</a>Registering handler for %s/%s [action %s].\n",
+				hookStd, tag,
+				hookStd, tag, cmd)
 			launchJobListener(mainCtx, tag, jobEnv, cmdMap)
 		}
 	}
 	log.Printf("--BACILLUS READY--\n")
+
+	// Live runlog is just the tail of full runlog
+	http.HandleFunc("/fullrunlog", fullRunlogHandler)
 
 	// A single endpoint handles the 'live' job output
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
