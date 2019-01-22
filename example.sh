@@ -56,5 +56,7 @@ if [ -e run.log ]; then
 fi
 
 bacillus "${OPTS}" \
- onPush_hkexsh_build:FOO=bar,BAZ=buzz:"./hkexsh_pushbuild.sh" \
- onPush_bacillus_env:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"/bin/bash -c env"
+ onPush_hkexsh_build:FOO=bar,BAZ=buzz:"hkexsh_pushbuild.sh" \
+ onPush_bacillus_env:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"/bin/bash -c env" \
+ onPush_bacillus_enva:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"artifact.sh"
+

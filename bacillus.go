@@ -27,14 +27,15 @@ const (
 )
 
 var (
-	addrPort        string
-	hookStd         string
-	apiKey          string
-	attachStdout    bool
+	addrPort     string
+	hookStd      string
+	apiKey       string
+	attachStdout bool
 	//statUseUnicode  bool
 	indStyle        string
 	instCounter     uint32
 	jobHomeDir      string
+	artifactBaseDir string
 	runLogTailLines int
 
 	//checkSeq string
@@ -275,6 +276,26 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmdMap map[string]string) {
+	instColours := []string{
+		"floralwhite",
+		"burlywood",
+		"cadetblue",
+		"chocolate",
+		"coral",
+		"cornflowerblue",
+		"cornsilk",
+		"darkcyan",
+		"darkgoldenrod",
+		"darkgrey",
+		"darkkhaki",
+		"darkorange",
+		"darksalmon",
+		"darkseagreen",
+		"darkturquoise",
+		"gainsboro",
+		"gold",
+		"goldenrod"}
+
 	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 		func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(fmt.Sprintf("Triggered %s", tag)))
@@ -290,33 +311,14 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 				}
 				cmdCancelCtx, cmdCancelFunc := context.WithCancel(mainCtx)
 				defer cmdCancelFunc()
-				c := exec.CommandContext(cmdCancelCtx, cmdStrList[0], cmdArgs...)
-				//c.Dir = execRoot
+				var cmdPrefix string
+				if cmdStrList[0][0] == '/' {
+					cmdPrefix = ""
+				} else {
+					cmdPrefix = "../"
+				}
 
-				// if jobHomeDir is set, set execution dir to
-				// it and let user define whether or not to persist
-				// WORKDIR via the BACILLUS_WORKDIR env var.
-				c.Dir, _ = filepath.Abs(jobHomeDir)
-
-				instColours := []string{
-					"floralwhite",
-					"burlywood",
-					"cadetblue",
-					"chocolate",
-					"coral",
-					"cornflowerblue",
-					"cornsilk",
-					"darkcyan",
-					"darkgoldenrod",
-					"darkgrey",
-					"darkkhaki",
-					"darkorange",
-					"darksalmon",
-					"darkseagreen",
-					"darkturquoise",
-					"gainsboro",
-					"gold",
-					"goldenrod"}
+				c := exec.CommandContext(cmdCancelCtx, cmdPrefix+cmdStrList[0], cmdArgs...)
 
 				//var terr error
 				//var workDir string
@@ -329,8 +331,11 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 				}
 				instColour := instColours[instColourIdx]
 
-				workDir, terr := ioutil.TempDir(c.Dir, "bacillus_")
+				dirTmp, _ := filepath.Abs(jobHomeDir)
+				workDir, terr := ioutil.TempDir(dirTmp, "bacillus_")
+				c.Dir = workDir
 				jobID := strings.Split(workDir, "_")[1]
+
 				var indent int64
 				var indentStr string
 				if indStyle == "indent" || indStyle == "both" {
@@ -338,11 +343,18 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					indentStr = strings.Repeat("-", int(indent%8)+1)
 				}
 
-				//log.Printf("%s[webhook  %s{%s}: %s]\n", indentStr,
-				//	tag, jobID, cmdMap[tag])
 				if terr != nil {
 					log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
 				} else {
+
+					// TODO: Spawn http.HandleFunc() or ? here to serve out
+					// /artifacts/ virtual URIs (See go http.FileSystem?)
+					// NOTE below won't work -- here the lifetime only is as long
+					// as the job, we want a handler that can look at the
+					// artifacts/ subdir(s) anytime after a job runs.
+					//http.Handle(fmt.Sprintf("/artifacts/%s", jobID),
+					//		http.FileServer(http.Dir(fmt.Sprintf("/%s/bacillus_%s/%s/", jobHomeDir, jobID, "artifacts"))))
+
 					var workerOutputPath string
 					var workerOutputFile *os.File
 					consoleFName := "console.out"
@@ -362,6 +374,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBID=%s", jobID))
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBTAG=%s", tag))
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_WORKDIR=%s", workDir))
+					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/%s_%s", workDir, tag, jobID)))
 					c.Env = append(c.Env, jobEnv...)
 
 					// Job output status is encoded in first line of output log.
@@ -434,10 +447,12 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						log.Printf("<span style='background-color:%s'>%s[&check;][event %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<a href='/artifacts/%s_%s'>[&check;]</a>[event %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
+							tag, jobID,
 							tag, workerOutputRelPath, jobID)
 					} else {
-						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'>[!]</span>[event %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='/artifacts/%s_%s'>[!]</a></span>[event %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
+							tag, jobID,
 							tag, workerOutputRelPath, jobID, werr)
 					}
 					if strings.Contains(strings.Join(c.Env, " "),
@@ -550,6 +565,14 @@ func main() {
 	}
 	log.Printf("--BACILLUS READY--\n")
 
+	// Make a filesystem available for dir/file storage & retrieval by
+	// jobs and devs. Jobs are responsible for its proper use.
+	artifactBaseDir, aerr := filepath.Abs("artifacts")
+	if aerr == nil {
+		http.Handle("/artifacts/",
+			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
+	}
+
 	// Live runlog is just the tail of full runlog
 	http.HandleFunc("/fullrunlog/", fullRunlogHandler)
 
@@ -558,8 +581,9 @@ func main() {
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
 
-	err := http.ListenAndServe(addrPort, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	//go func() {
+	//	log.Fatal(http.ListenAndServe(":9991", http.FileServer(http.Dir(jobHomeDir))))
+	//}()
+
+	log.Fatal(http.ListenAndServe(addrPort, nil))
 }
