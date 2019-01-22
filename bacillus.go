@@ -292,7 +292,22 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 
 	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 		func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(fmt.Sprintf("Triggered %s", tag)))
+			// TODO: JS for history.back() after 5 seconds?
+
+			io.WriteString(w, `
+					<html>
+					<head>
+					<script>
+					setInterval(function(){ window.location.href = document.referrer; }, 3000);
+					</script>
+					</head>
+					<body>
+					`)
+			w.Write([]byte(fmt.Sprintf("<pre>Triggered %s</pre>", tag)))
+			io.WriteString(w, `
+					</body>
+					</html>`)
+
 			go func() {
 				//log.Printf("URL params:%+v\n", r.URL.Query())
 				//if r.URL.Query()["p1"] != nil {
@@ -487,12 +502,12 @@ func main() {
 	logfile, _ := os.Create("run.log")
 	log.SetOutput(logfile)
 
-	log.Printf("[bacillus %s startup]\n", appVer)
+	log.Printf("[bacillus %s startup] <a href='/'>usage</a>\n", appVer)
 	log.Printf("[listening on %s, type %s]\n", addrPort, hookStd)
 
 	cmdMap := make(map[string]string)
 
-	log.Printf("Registering handler for /runlog page.\n")
+	//log.Printf("Registering handler for /runlog page.\n")
 	http.HandleFunc("/runlog", func(w http.ResponseWriter, r *http.Request) {
 		//if statUseUnicode {
 		//	checkSeq = "o"
@@ -564,7 +579,7 @@ func main() {
 		// (ie., if webhook request contains POST JSON data,
 		// it isn't read).
 		if len(tag) > 0 {
-			log.Printf("<a href='%s/%s'>[&#9654;]</a>Registering handler for %s/%s [action %s].\n",
+			log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s].\n",
 				hookStd, tag,
 				hookStd, tag, cmd)
 			launchJobListener(mainCtx, tag, jobEnv, cmdMap)
