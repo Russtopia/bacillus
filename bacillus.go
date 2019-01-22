@@ -392,12 +392,11 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					} else {
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("<span style='background-color:%s'>%s<a href='%s'>[o]</a>[event %s{%s}<a href='/cancel/%s'>[X]</a> triggered. (workDir %s)]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<a href='%s'>[o]</a>[event %s{%s}<a href='/cancel/%s'>[X]</a> triggered.]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
 							tag,
 							jobID,
-							jobID,
-							workDir)
+							jobID)
 						//log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
 						//	workerOutputRelPath, workerOutputRelPath)
 
@@ -446,13 +445,22 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						log.Printf("<span style='background-color:%s'>%s<a href='/artifacts/%s_%s'>[&check;]</a>[event %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
+						//log.Printf("<span style='background-color:%s'>%s<a href='/artifacts/%s_%s'>[&check;]</a>[event %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
+						//	tag, jobID,
+						//	tag, workerOutputRelPath, jobID)
+						log.Printf("<span style='background-color:%s'>%s<a href='%s'>[&check;]</a>[event %s{%s}<a href='/artifacts/%s_%s'>[&sum;]</a> completed with status 0]</span>\n", instColour, indentStr,
+							workerOutputRelPath,
 							tag, jobID,
-							tag, workerOutputRelPath, jobID)
+							tag, jobID)
 					} else {
-						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='/artifacts/%s_%s'>[!]</a></span>[event %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
+						//log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='/artifacts/%s_%s'>[!]</a></span>[event %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
+						//	tag, jobID,
+						//	tag, workerOutputRelPath, jobID, werr)
+						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='%s'>[!]</a></span>[event %s{%s}<a href='/artifacts/%s_%s'>[&part;]</a> completed with error %s]</span>\n", instColour, indentStr,
+							workerOutputRelPath,
 							tag, jobID,
-							tag, workerOutputRelPath, jobID, werr)
+							tag, jobID,
+							werr)
 					}
 					if strings.Contains(strings.Join(c.Env, " "),
 						"BACILLUS_REMOVE_WORKDIR") {
