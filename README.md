@@ -58,8 +58,9 @@ $ curl -s http://localhost:9990/blind/onPush_hkexsh_build
 Observe execution on localhost:9990/runlog
 
 ## Controlling Jobs
-* Endpoints in the /runlog view have a [>] beside them; you can launch jobs by clicking on these. The launched job status will appear in /runlog on the next page refresh (10s).
+* Endpoints in the /runlog view have a [>] beside them; you can launch jobs manually by clicking on these. The launched job status will appear in /runlog on the next page refresh (10s).
 * When a job is launched, it has a [C] beside the launch entry. Clicking on this will cancel the job.
+* When a job has finished, it will either have a [&check;] or [!] in red, either of which is a clickable link to the job's artifacts directory (jobs by convention should place all of their 'artifacts' in ${BACILLUS_ARTFDIR} which points to this location).
 * To view a job's progress (its 'live console'), click on the jobID link.
 * Running jobs show, in their live console page, the most recent output lines and, if the output grows large enough, a link to the full console output (at the moment) at the top. A coloured spinner/status bubble is at the bottom of the live console indicating the job's running or completion status.
 * When a job completes, the spinner changes to an exit status code indicator and the live console stops refreshing.
