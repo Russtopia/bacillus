@@ -392,10 +392,11 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					} else {
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("<span style='background-color:%s'>%s<a href='/cancel/%s'>[C]</a>[event %s{<a href='%s'>%s</a>} triggered. (workDir %s)]</span>\n", instColour, indentStr,
-							jobID,
+						log.Printf("<span style='background-color:%s'>%s<a href='%s'>[o]</a>[event %s{%s}<a href='/cancel/%s'>[X]</a> triggered. (workDir %s)]</span>\n", instColour, indentStr,
+							workerOutputRelPath,
 							tag,
-							workerOutputRelPath, jobID,
+							jobID,
+							jobID,
 							workDir)
 						//log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
 						//	workerOutputRelPath, workerOutputRelPath)
@@ -403,9 +404,13 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 						// Spawn handler for /cancel/<jobID>
 						http.HandleFunc(fmt.Sprintf("/cancel/%s", jobID),
 							func(w http.ResponseWriter, r *http.Request) {
-								jobCancellers[jobID]()
-								//delete(jobCancellers, jobID)
-								w.Write([]byte(fmt.Sprintf("Cancelled %s", jobID)))
+								if jobCancellers[jobID] != nil {
+									jobCancellers[jobID]()
+									//delete(jobCancellers, jobID)
+									w.Write([]byte(fmt.Sprintf("Cancelled %s", jobID)))
+								} else {
+									w.Write([]byte(fmt.Sprintf("Job %s already done or not found.", jobID)))
+								}
 							})
 					}
 					werr := c.Wait()
@@ -574,6 +579,28 @@ func main() {
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
+
+	// And finally, the root fallback to give help on defined endpoints.
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-type", "text/html")
+		io.WriteString(w, `
+							<html>
+							<head>
+							</head>
+							<body>
+							`)
+		io.WriteString(w, `
+  <pre>
+  <a href='/runlog'>/runlog</a>: main log/activity view
+  <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
+  .. that's about it.
+  </pre>
+							`)
+		io.WriteString(w, `
+							</body>
+							</html>
+							`)
+	})
 
 	//go func() {
 	//	log.Fatal(http.ListenAndServe(":9991", http.FileServer(http.Dir(jobHomeDir))))
