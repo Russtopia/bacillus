@@ -215,22 +215,16 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	fullConsLink := lines[1]
 	var tail []string
 
-	//TODO: analyze line 1, if status == 'f' and exitCode == '000' then suppress spinner
-	// and reload timer; if exitCode != '000', consider red static '!' in place of spinner
-	// (and still no reload)
 	var stat rune
 	var code int //TODO: use to determine red failure marker?
 	n, e := fmt.Sscanf(consStat, "[%c %03d]", &stat, &code)
 	_ = n
 	if l > 0 {
 		tail = lines[len(lines)-tailL:]
-		//consoleLog = []byte(consStat + "\n" + fullConsLink + "\n" +
-		//	strings.Join(tail, "\n"))
 		_ = fullConsLink
 		consoleLog = []byte("<a href=\"" + fullConsLink + "\">full log</a>\n" + strings.Join(tail, "\n"))
 	} else {
 		tail = lines[2:]
-		//consoleLog = []byte(consStat + "\n\n" + strings.Join(tail, "\n"))
 		consoleLog = []byte(strings.Join(tail, "\n"))
 	}
 
