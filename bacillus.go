@@ -96,7 +96,7 @@ appendSpinner = function() {
 }
 
 func getRunLogCSS() string {
-		return `
+	return `
 		<style>
 		a:link { text-decoration:none; }
 		a:hover { text-decoration:underline; }
@@ -280,7 +280,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 `)
 }
 
-func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmdMap map[string]string) {
+func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
 	instColours := []string{
 		"floralwhite",
 		"burlywood",
@@ -301,7 +301,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 		"gold",
 		"goldenrod"}
 
-	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
+	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, jobTag),
 		func(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, `
 					<html>
@@ -313,7 +313,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					</head>
 					<body>
 					`)
-			w.Write([]byte(fmt.Sprintf("<pre>Triggered %s</pre>", tag)))
+			io.WriteString(w, fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag))
 			io.WriteString(w, `
 					</body>
 					</html>`)
@@ -323,7 +323,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 				//if r.URL.Query()["p1"] != nil {
 				//	log.Printf("p1:%s", r.URL.Query()["p1"][0])
 				//}
-				cmdStrList := strings.Split(cmdMap[tag], " ")
+				cmdStrList := strings.Split(cmdMap[jobTag], " ")
 				cmdArgs := []string{""}
 				if len(cmdStrList) > 1 {
 					cmdArgs = cmdStrList[1:]
@@ -351,9 +351,9 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 				instColour := instColours[instColourIdx]
 
 				dirTmp, _ := filepath.Abs(jobHomeDir)
-				workDir, terr := ioutil.TempDir(dirTmp, "bacillus_")
+				workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_", jobOpts))
 				c.Dir = workDir
-				jobID := strings.Split(workDir, "_")[1]
+				jobID := strings.Split(workDir, "_")[2]
 
 				var indent int64
 				var indentStr string
@@ -363,22 +363,13 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 				}
 
 				if terr != nil {
-					log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, tag)
+					log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, jobTag)
 				} else {
-
-					// TODO: Spawn http.HandleFunc() or ? here to serve out
-					// /artifacts/ virtual URIs (See go http.FileSystem?)
-					// NOTE below won't work -- here the lifetime only is as long
-					// as the job, we want a handler that can look at the
-					// artifacts/ subdir(s) anytime after a job runs.
-					//http.Handle(fmt.Sprintf("/artifacts/%s", jobID),
-					//		http.FileServer(http.Dir(fmt.Sprintf("/%s/bacillus_%s/%s/", jobHomeDir, jobID, "artifacts"))))
-
 					var workerOutputPath string
 					var workerOutputFile *os.File
 					consoleFName := "console.out"
 					workerOutputPath = workDir + "/" + consoleFName
-					workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s/%s", jobHomeDir, jobID, consoleFName)
+					workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s/%s", jobHomeDir, jobOpts, jobID, consoleFName)
 					if attachStdout {
 						c.Stdout = os.Stdout
 						c.Stderr = os.Stderr
@@ -391,9 +382,9 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					c.Env = append(c.Env, fmt.Sprintf("USER=%s", os.Getenv("USER")))
 					c.Env = append(c.Env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBID=%s", jobID))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBTAG=%s", tag))
+					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBTAG=%s", jobTag))
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_WORKDIR=%s", workDir))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/%s_%s", workDir, tag, jobID)))
+					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s", workDir, jobOpts, jobID)))
 					c.Env = append(c.Env, jobEnv...)
 
 					// Job output status is encoded in first line of output log.
@@ -413,13 +404,13 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 						w.WriteHeader(500)
 						w.Write([]byte("ERR"))
 						log.Printf("%s[ERROR on event %s trigger.]\n", indentStr,
-							tag)
+							jobTag)
 					} else {
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
 						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Running'>[&acd;]</a>[event %s{%s}<a href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
-							tag,
+							jobTag,
 							jobID,
 							jobID)
 						//log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
@@ -428,13 +419,25 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 						// Spawn handler for /cancel/<jobID>
 						http.HandleFunc(fmt.Sprintf("/cancel/%s", jobID),
 							func(w http.ResponseWriter, r *http.Request) {
+								io.WriteString(w, `
+					<html>
+					<head>
+					<script>
+					// Go back after a short delay
+					setInterval(function(){ window.location.href = document.referrer; }, 3000);
+					</script>
+					</head>
+					<body>
+					`)
 								if jobCancellers[jobID] != nil {
 									jobCancellers[jobID]()
-									//delete(jobCancellers, jobID)
-									w.Write([]byte(fmt.Sprintf("Cancelled %s", jobID)))
+									io.WriteString(w, fmt.Sprintf("<pre>Cancelled %s</pre>\n", jobID))
 								} else {
-									w.Write([]byte(fmt.Sprintf("Job %s already done or not found.", jobID)))
+									io.WriteString(w, fmt.Sprintf("<pre>Job %s already done or not found.</pre>\n", jobID))
 								}
+								io.WriteString(w, `
+					</body>
+					</html>`)
 							})
 					}
 					werr := c.Wait()
@@ -470,15 +473,15 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Done'>[&check;]</a>[event %s{%s}<a href='/artifacts/%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Done'>[&check;]</a>[event %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
-							tag, jobID,
-							tag, jobID)
+							jobTag, jobID,
+							jobOpts, jobID)
 					} else {
-						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>[event %s{%s}<a href='/artifacts/%s_%s' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>[event %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
-							tag, jobID,
-							tag, jobID,
+							jobTag, jobID,
+							jobOpts, jobID,
 							werr)
 					}
 					if strings.Contains(strings.Join(c.Env, " "),
@@ -489,6 +492,43 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 			}()
 		})
 }
+
+/*
+ func getTagFields(tag string) (mainName string, spec rune) {
+	// suffixes of job tag specify desired retention for workdir
+	// and artifacts, eg.
+	// myJob_kD = retain for 24 hours
+	// myJob_kW = retain for a week
+	// myJob_kF = retain forever (until manually removed)
+	// myJob = (default) 24 hours, see 'retainD'
+	// .. if a job takes longer than the retention suffix specifies to run,
+	//    results will be undefined.
+
+	idx := strings.LastIndex(tag, "_k")
+	fmt.Println("idx:", idx)
+	spec = '_'
+	mainName = tag
+	if idx >= 0 {
+		if len(tag) < idx+len("_k") {
+			spec = rune(tag[idx+len("_k")])
+		}
+		mainName = tag[:idx] // drop retain suffix
+	}
+
+	switch spec {
+	case 'D':
+		fmt.Println("spec D")
+	case 'W':
+		fmt.Println("spec W")
+	case 'F':
+		fmt.Println("spec F")
+	default:
+		fmt.Println("(default) spec D")
+		spec = 'D'
+	}
+	return
+}
+*/
 
 func main() {
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
@@ -504,8 +544,8 @@ func main() {
 	jobCancellers = make(map[string]func())
 
 	logfile, _ := os.Create("run.log")
+	
 	log.SetOutput(logfile)
-
 	log.Printf("[bacillus %s startup] <a href='/'>usage</a>\n", appVer)
 	log.Printf("[listening on %s, type %s]\n", addrPort, hookStd)
 
@@ -527,8 +567,8 @@ func main() {
 		io.WriteString(w, `
 				<html>
 				<head>
-				<meta http-equiv="refresh" content="5">` +
-						getRunLogCSS() + `
+				<meta http-equiv="refresh" content="5">`+
+			getRunLogCSS()+`
 				</head>
 				<body>
 				`)
@@ -564,33 +604,48 @@ func main() {
 	jobHomeDir = "workdir"
 	// Each non-switch argument is taken to be an endpoint (job) descriptor
 	// Syntax of an endpoint:
-	//  endpoint:jobDir:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
+	//  endpoint:jobOpts:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
 	for _, e := range flag.Args() {
+
 		fields := strings.Split(e, ":")
-		tag := fields[0]
+		var tag string
+		var jobOpts string
 		var jobEnv []string
 		var cmd string
-		if len(fields) > 1 { /*&& fields[1] != "" {*/
-			jobEnv = strings.Split(fields[1], ",")
-		}
-		if len(fields) > 2 && fields[2] != "" {
-			cmd = fields[2]
-		}
+		if fields[0] != e {
+			tag = fields[0]
+			if len(fields) > 1 && len(fields) != 4 {
+				errStr := fmt.Sprintf("\n  [%s]\n"+
+					"  All endpoint specs must have exactly 4 fields:\n"+
+					"    endpoint:jobOpts:envVars:cmd\n"+
+					"  (jobOpts and envVars may be empty.)\n",
+						fields[0])
+				fmt.Print(errStr)
+				log.Fatal(errStr)
+			}
 
-		cmdMap[tag] = cmd
+			jobOpts = fields[1]
+			_ = jobOpts
+			jobEnv = strings.Split(fields[2], ",")
+			cmd = fields[3]
 
-		// Launch webhook listeners for each defined endpoint
-		// Note presently only 'blind' hookStd is supported
-		// (ie., if webhook request contains POST JSON data,
-		// it isn't read).
-		if len(tag) > 0 {
-			//log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s].\n",
-			log.Printf("<a href='%s/%s' title='Play Job'>[&rtrif;]</a>%s/%s [action %s].\n",
-				hookStd, tag,
-				hookStd, tag, cmd)
-			launchJobListener(mainCtx, tag, jobEnv, cmdMap)
+			cmdMap[tag] = cmd
+
+			// Launch webhook listeners for each defined endpoint
+			// Note presently only 'blind' hookStd is supported
+			// (ie., if webhook request contains POST JSON data,
+			// it isn't read).
+			if len(tag) > 0 {
+				//log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s].\n",
+				log.Printf("<a href='%s/%s' title='Play Job'>[&rtrif;]</a>%s/%s [action %s].\n",
+					hookStd, tag,
+					hookStd, tag, cmd)
+
+				launchJobListener(mainCtx, tag, jobOpts, jobEnv, cmdMap)
+			}
 		}
 	}
+	
 	log.Printf("--BACILLUS READY--\n")
 
 	// Make a filesystem available for dir/file storage & retrieval by

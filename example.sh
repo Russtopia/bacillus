@@ -5,7 +5,13 @@
 ## work on a few demonstration webhook endpoints.
 ##
 ## Syntax of an endpoint:
-##  endpoint:jobDir:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
+##  endpoint:jobOpts:jobDir:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
+##
+## Currently _jobOpts_ is user-defined, and is not interpreted by bacillus
+## at all. It is merely inserted into the tempDir() generated for each job
+## instance, to allow external tools to do things based on the jobOpts
+## of each (such as an external tempDir and artifact dir reaper,
+## to clean up various jobs based on differing schedules).
 ##
 ## bacillus launches each worker within its own start location (eg., if one
 ## starts bacillus within /opt/bacillus/, each worker starts off there),
@@ -14,9 +20,9 @@
 ## Each endpoint script should use BACILLUS_WORKDIR to do its work and not
 ## pollute other filesystem locations.
 ##
-## Following the _jobDir_ field is a comma-delimited list of zero or more
-## user-defined environment variables, allowing unique job parameters to
-## be passed as part of the final _cmd_ field's shell environment.
+## Following the _jobDir_ and _jobOpts_ fields are a comma-delimited list
+## of zero or more user-defined environment variables, allowing unique job
+## parameters to be passed as part of the final _cmd_ field's shell environment.
 ##
 ## The final _cmd_ field is a set of one or more space-delimited tokens,
 ## the first of which is the command itself (usually a user-defined script)
@@ -55,8 +61,21 @@ if [ -e run.log ]; then
   mv -f run.log run.log.bak
 fi
 
-bacillus "${OPTS}" \
- onPush_hkexsh_build:FOO=bar,BAZ=buzz:"hkexsh_pushbuild.sh" \
- onPush_bacillus_env:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"/bin/bash -c env" \
- onPush_bacillus_enva:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"artifact.sh"
+## Note the jobOpts 'kD','kF' in this example are completely user-defined:
+## bacillus merely propagates these into work- and artifact directory names
+## to allow external tools to filter them. For example, here they stand for
+## 'keep Day' and 'keep Forever', and a cron job could use the tags to
+## reap old job dirs:
+##
+## */5 * * * *
+## /bin/rm -rf $(/bin/find workdir/bacillus_kD* artifacts/bacillus_kD* \
+##   -maxdepth 0 -type d -mmin +1440)
+## /bin/rm -rf $(/bin/find workdir/bacillus_kW* artifacts/bacillus_kW* \
+##   -maxdepth 0 -type d -mmin +10080)
+## 
 
+
+bacillus "${OPTS}" \
+ onPush_hkexsh_build::FOO=bar,BAZ=buzz:"hkexsh_pushbuild.sh" \
+ onPush_bacillus_env:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"/bin/bash -c env" \
+ onPush_bacillus_enva:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"artifact.sh"
