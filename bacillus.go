@@ -2,6 +2,7 @@
 // arbitrary commands on receipt of webhook events.
 // Supported webhook event formats: gogs, (.. future)
 //
+// Qui Verifiers ratum efficiat?
 package main
 
 import (
@@ -92,6 +93,16 @@ appendSpinner = function() {
 ////////////////////////
 </script>`
 	}
+}
+
+func getRunLogCSS() string {
+		return `
+		<style>
+		a:link { text-decoration:none; }
+		a:hover { text-decoration:underline; }
+		a:active { text-decoration:underline; }
+		</style>
+		`
 }
 
 func getStyleCSS() string {
@@ -292,12 +303,11 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 
 	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, tag),
 		func(w http.ResponseWriter, r *http.Request) {
-			// TODO: JS for history.back() after 5 seconds?
-
 			io.WriteString(w, `
 					<html>
 					<head>
 					<script>
+					// Go back after a short delay
 					setInterval(function(){ window.location.href = document.referrer; }, 3000);
 					</script>
 					</head>
@@ -407,7 +417,7 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					} else {
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("<span style='background-color:%s'>%s<a href='%s'>[o]</a>[event %s{%s}<a href='/cancel/%s'>[X]</a> triggered.]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Running'>[&acd;]</a>[event %s{%s}<a href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
 							tag,
 							jobID,
@@ -460,18 +470,12 @@ func launchJobListener(mainCtx context.Context, tag string, jobEnv []string, cmd
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						//log.Printf("<span style='background-color:%s'>%s<a href='/artifacts/%s_%s'>[&check;]</a>[event %s{<a href='%s'>%s</a>} completed with status 0]</span>\n", instColour, indentStr,
-						//	tag, jobID,
-						//	tag, workerOutputRelPath, jobID)
-						log.Printf("<span style='background-color:%s'>%s<a href='%s'>[&check;]</a>[event %s{%s}<a href='/artifacts/%s_%s'>[&sum;]</a> completed with status 0]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Done'>[&check;]</a>[event %s{%s}<a href='/artifacts/%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
 							tag, jobID,
 							tag, jobID)
 					} else {
-						//log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='/artifacts/%s_%s'>[!]</a></span>[event %s{<a href='%s'>%s</a>} completed with error %s]</span>\n", instColour, indentStr,
-						//	tag, jobID,
-						//	tag, workerOutputRelPath, jobID, werr)
-						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='%s'>[!]</a></span>[event %s{%s}<a href='/artifacts/%s_%s'>[&part;]</a> completed with error %s]</span>\n", instColour, indentStr,
+						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>[event %s{%s}<a href='/artifacts/%s_%s' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span>\n", instColour, indentStr,
 							workerOutputRelPath,
 							tag, jobID,
 							tag, jobID,
@@ -523,7 +527,8 @@ func main() {
 		io.WriteString(w, `
 				<html>
 				<head>
-				<meta http-equiv="refresh" content="5">
+				<meta http-equiv="refresh" content="5">` +
+						getRunLogCSS() + `
 				</head>
 				<body>
 				`)
@@ -579,7 +584,8 @@ func main() {
 		// (ie., if webhook request contains POST JSON data,
 		// it isn't read).
 		if len(tag) > 0 {
-			log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s].\n",
+			//log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s].\n",
+			log.Printf("<a href='%s/%s' title='Play Job'>[&rtrif;]</a>%s/%s [action %s].\n",
 				hookStd, tag,
 				hookStd, tag, cmd)
 			launchJobListener(mainCtx, tag, jobEnv, cmdMap)
