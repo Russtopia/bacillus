@@ -311,7 +311,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					setInterval(function(){ window.location.href = document.referrer; }, 3000);
 					</script>
 					</head>
-					<body>
+                    <body>
 					`)
 			io.WriteString(w, fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag))
 			io.WriteString(w, `
@@ -655,7 +655,10 @@ func main() {
 		http.Handle("/artifacts/",
 			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
 	}
-
+	
+	http.Handle("/images/",
+			http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
+	
 	// Live runlog is just the tail of full runlog
 	http.HandleFunc("/fullrunlog/", fullRunlogHandler)
 
@@ -663,7 +666,7 @@ func main() {
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
-
+	
 	// And finally, the root fallback to give help on defined endpoints.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-type", "text/html")
@@ -671,13 +674,23 @@ func main() {
 							<html>
 							<head>
 							</head>
-							<body>
+							<body style='background-image: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%), url("/images/bacillus.jpg"); background-size: cover;'>
 							`)
 		io.WriteString(w, `
   <pre>
   <a href='/runlog'>/runlog</a>: main log/activity view
   <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
-  .. that's about it.
+  
+  LEGEND
+  [&rtrif;] Start a job manually
+  [&cross;] Cancel a running job
+  [&ccupssm;] View completed job artifacts
+  [&ccups;] View partial artifacts for a failed job
+  [&acd;] Job is running - click to view in-progress output
+  [&check;] Job has completed with OK(0) status - click to view output
+  <span style='background-color:red'>[!]</span> Job has exited with nonzero status - click to view output
+
+  .. that's about it. Happy build-automating!
   </pre>
 							`)
 		io.WriteString(w, `
