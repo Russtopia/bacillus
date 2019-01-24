@@ -46,6 +46,15 @@ var (
 	jobCancellers map[string]func()
 )
 
+func getGoBackHeaderJS(ms string) string {
+	return fmt.Sprintf(`
+<script>
+  // Go back after a short delay
+  setInterval(function(){ window.location.href = document.referrer; }, %s);
+</script>
+`, ms)
+}
+
 func getRefreshJS(stat rune) string {
 	if stat == 'r' {
 		return `<meta http-equiv="refresh" content="5">`
@@ -305,11 +314,8 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 		func(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, `
 					<html>
-					<head>
-					<script>
-					// Go back after a short delay
-					setInterval(function(){ window.location.href = document.referrer; }, 3000);
-					</script>
+					<head>`+
+				getGoBackHeaderJS("3000")+`
 					</head>
                     <body>
 					`)
@@ -359,11 +365,11 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 				var indentStr string
 				if indStyle == "indent" || indStyle == "both" {
 					indent, _ = strconv.ParseInt(jobID, 10, 64)
-					indentStr = strings.Repeat("-", int(indent%8)+1)
+					indentStr = strings.Repeat("-", int(indent%8)+4)
 				}
 
 				if terr != nil {
-					log.Printf("[ERROR creating workdir (%s) for event %s trigger.]\n", terr, jobTag)
+					log.Printf("[ERROR creating workdir (%s) for job %s trigger.]\n", terr, jobTag)
 				} else {
 					var workerOutputPath string
 					var workerOutputFile *os.File
@@ -403,15 +409,16 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 						log.Printf("[exec.Cmd: %+v]\n", c)
 						w.WriteHeader(500)
 						w.Write([]byte("ERR"))
-						log.Printf("%s[ERROR on event %s trigger.]\n", indentStr,
+						log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
 							jobTag)
 					} else {
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Running'>[&acd;]</a>[event %s{%s}<a href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n", instColour, indentStr,
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
+							jobID, instColour,
 							workerOutputRelPath,
-							jobTag,
-							jobID,
+							indentStr,
+							jobTag, jobID,
 							jobID)
 						//log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
 						//	workerOutputRelPath, workerOutputRelPath)
@@ -421,11 +428,8 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 							func(w http.ResponseWriter, r *http.Request) {
 								io.WriteString(w, `
 					<html>
-					<head>
-					<script>
-					// Go back after a short delay
-					setInterval(function(){ window.location.href = document.referrer; }, 3000);
-					</script>
+					<head>`+
+									getGoBackHeaderJS("3000")+`
 					</head>
 					<body>
 					`)
@@ -473,13 +477,17 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					// TODO: console log endpoint check for existence of job.status;
 
 					if werr == nil {
-						log.Printf("<span style='background-color:%s'>%s<a href='%s' title='Done'>[&check;]</a>[event %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span>\n", instColour, indentStr,
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
+							jobID, instColour,
 							workerOutputRelPath,
+							indentStr,
 							jobTag, jobID,
 							jobOpts, jobID)
 					} else {
-						log.Printf("<span style='background-color:%s'>%s<span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>[event %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span>\n", instColour, indentStr,
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
+							jobID, instColour,
 							workerOutputRelPath,
+							indentStr,
 							jobTag, jobID,
 							jobOpts, jobID,
 							werr)
@@ -493,49 +501,85 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 		})
 }
 
-/*
- func getTagFields(tag string) (mainName string, spec rune) {
-	// suffixes of job tag specify desired retention for workdir
-	// and artifacts, eg.
-	// myJob_kD = retain for 24 hours
-	// myJob_kW = retain for a week
-	// myJob_kF = retain forever (until manually removed)
-	// myJob = (default) 24 hours, see 'retainD'
-	// .. if a job takes longer than the retention suffix specifies to run,
-	//    results will be undefined.
-
-	idx := strings.LastIndex(tag, "_k")
-	fmt.Println("idx:", idx)
-	spec = '_'
-	mainName = tag
-	if idx >= 0 {
-		if len(tag) < idx+len("_k") {
-			spec = rune(tag[idx+len("_k")])
+//FIXME: There is definitely a less copy-intensive way to do this.
+func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
+	// The data being patched is a 'live' view, limited to a tail
+	// portion of the actual run.log. In light of this we only need
+	// to reconcile finished jobs back a short distance, larger than
+	// the displayed tail length, in lines.
+	// Jobs should take longer than a few seconds, which is the
+	// refresh interval of the /runlog endpoint; so there *should*
+	// only be a very small number of entries that have completed
+	// since the last scan and still visible on the 'live' web view.
+	// We'll only look for those few, so if there was a spamming run of
+	// short-lived jobs, we might not mark all of them as completed.
+	// Meh. Not worth an O(n^2) operation.
+	fixed = orig
+	
+	// As described above, prevent excessive processing for live web view
+	if horizon > 255 {
+			horizon = 255
+	}
+	
+	l := len(fixed) - 1
+	if l > 1 {
+		if l > horizon {
+			horizon = l - horizon
+		} else {
+			horizon = 0
 		}
-		mainName = tag[:idx] // drop retain suffix
-	}
 
-	switch spec {
-	case 'D':
-		fmt.Println("spec D")
-	case 'W':
-		fmt.Println("spec W")
-	case 'F':
-		fmt.Println("spec F")
-	default:
-		fmt.Println("(default) spec D")
-		spec = 'D'
+		for idx := l; idx > horizon; idx-- {
+			//fmt.Println("idx:", idx, "l:", l, "horizon:", horizon)
+			if strings.Count(fixed[idx], "<!--COMPLETION-->") != 0 {
+				//fmt.Println("found COMPLETION")
+				// Found a completed job. Seek a few entries back
+				// to mark the job launch stmt, hiding the in-progress
+				// and cancel links within.
+				var jidStart, jidEnd int
+				var jobID string
+				jidStart = strings.Index(fixed[idx], "<!--JOBID:")
+				if jidStart != -1 {
+					jidStart += len("<!--JOBID:")
+					jidEnd = strings.Index(fixed[idx], ":JOBID-->")
+				}
+				if jidStart != -1 && jidEnd != -1 {
+					jobID = fixed[idx][jidStart:jidEnd]
+					jobTag := "<!--JOBID:" + jobID + ":JOBID-->"
+					//fmt.Printf("found %s\n", jobTag)
+					for seekIdx := idx - 1; seekIdx >= 0 && seekIdx > horizon; seekIdx-- {
+						// NOTE we're modifying the 'live' view of
+						// the logfile, not the direct data on disk, so
+						// no need to replace byte-for-byte.
+						// (If this func is optimized to be zero-copy
+						//  however, it might need to be.)
+						if strings.Contains(fixed[seekIdx], jobTag) {
+							//fmt.Println("found jobTag, patching")
+							fixed[seekIdx] = strings.Replace(fixed[seekIdx],
+								"display:inline", "display:none", -1)
+							if indStyle == "both" || indStyle == "indent" {
+								fixed[seekIdx] = strings.Replace(fixed[seekIdx],
+									"---", "------", 1)
+							} else if indStyle == "colour" {
+								fixed[seekIdx] = strings.Replace(fixed[seekIdx],
+									"[job", "   [job", 1)
+							}
+						}
+					}
+				}
+			}
+		}
 	}
-	return
+	//fmt.Println(fixed)
+	return fixed
 }
-*/
 
 func main() {
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
 	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
-	flag.IntVar(&runLogTailLines, "rl", 32, "Scroll length of runlog (set to 0 for no limit)")
+	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	//flag.BoolVar(&statUseUnicode, "S", true, "set to false to use plain ASCII (ISO-8859-1) in /runlog")
 	flag.Parse()
@@ -544,7 +588,7 @@ func main() {
 	jobCancellers = make(map[string]func())
 
 	logfile, _ := os.Create("run.log")
-	
+
 	log.SetOutput(logfile)
 	log.Printf("[bacillus %s startup] <a href='/'>usage</a>\n", appVer)
 	log.Printf("[listening on %s, type %s]\n", addrPort, hookStd)
@@ -581,6 +625,10 @@ func main() {
 		lines := strings.Split(string(rl), "--BACILLUS READY--")
 		tailLines := strings.Split(lines[1], "\n")
 		tailCount := len(tailLines)
+
+		//TODO: scan backwards in log for completion msgs, match with
+		// preceding launch msgs to un-mark the in-progress and cancel icons there
+		tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
 
 		io.WriteString(w, "<pre style='background-color: skyblue;'>")
 		io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
@@ -619,7 +667,7 @@ func main() {
 					"  All endpoint specs must have exactly 4 fields:\n"+
 					"    endpoint:jobOpts:envVars:cmd\n"+
 					"  (jobOpts and envVars may be empty.)\n",
-						fields[0])
+					fields[0])
 				fmt.Print(errStr)
 				log.Fatal(errStr)
 			}
@@ -636,8 +684,8 @@ func main() {
 			// (ie., if webhook request contains POST JSON data,
 			// it isn't read).
 			if len(tag) > 0 {
-				//log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s].\n",
-				log.Printf("<a href='%s/%s' title='Play Job'>[&rtrif;]</a>%s/%s [action %s].\n",
+				//log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s]\n",
+				log.Printf("<a href='%s/%s' title='Play Job'>[&rtrif;]</a>%s/%s [action %s]\n",
 					hookStd, tag,
 					hookStd, tag, cmd)
 
@@ -645,7 +693,7 @@ func main() {
 			}
 		}
 	}
-	
+
 	log.Printf("--BACILLUS READY--\n")
 
 	// Make a filesystem available for dir/file storage & retrieval by
@@ -655,10 +703,10 @@ func main() {
 		http.Handle("/artifacts/",
 			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
 	}
-	
+
 	http.Handle("/images/",
-			http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
-	
+		http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
+
 	// Live runlog is just the tail of full runlog
 	http.HandleFunc("/fullrunlog/", fullRunlogHandler)
 
@@ -666,7 +714,7 @@ func main() {
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
-	
+
 	// And finally, the root fallback to give help on defined endpoints.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-type", "text/html")
