@@ -72,7 +72,13 @@ fi
 ##   -maxdepth 0 -type d -mmin +10080)
 ## 
 
-bacillus -a=:9990 -rl=30 \
+
+bacillus -a=:9991 -i=colour -rl=30 \
  onPush_hkexsh_build::FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
- onPush_bacillus_env:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"env" \
- onPush_bacillus_enva:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh"
+ onPush_bacillus_env:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"/usr/bin/env --help" \
+ onPush_bacillus_enva:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"pwd" \
+ onPush_bacillus_envb:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh 3" \
+ onPush_bacillus_envc:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh 7" \
+ onPush_bacillus_envd:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh 11" \
+ onPush_bacillus_enve:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh 13" \
+ onPush_bacillus_envf:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh 17"

@@ -2,7 +2,7 @@
 // arbitrary commands on receipt of webhook events.
 // Supported webhook event formats: gogs, (.. future)
 //
-// Qui Verifiers ratum efficiat?
+// Qui verifiers ratum efficiat?
 package main
 
 import (
@@ -192,7 +192,7 @@ func getCompatJS() string {
 // job invocation in a GET or POST request.
 
 func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
-	runLog, e := ioutil.ReadFile("run.log")
+	runLog, e := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 	if e != nil {
 		w.Write([]byte(fmt.Sprintf("%s", e)))
 		return
@@ -325,25 +325,21 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					</html>`)
 
 			go func() {
-				//log.Printf("URL params:%+v\n", r.URL.Query())
-				//if r.URL.Query()["p1"] != nil {
-				//	log.Printf("p1:%s", r.URL.Query()["p1"][0])
-				//}
-				cmdStrList := strings.Split(cmdMap[jobTag], " ")
-				cmdArgs := []string{""}
-				if len(cmdStrList) > 1 {
-					cmdArgs = cmdStrList[1:]
-				}
+				// Some wrinkles in the exec.Command API: If there are no args,
+				// one must completely omit the args ... to avoid strange errors
+				// with some commands that see a blank "" arg and complain.
+				cmd := strings.Split(cmdMap[jobTag], " ")[0]
+				cmdStrList := strings.Split(cmdMap[jobTag], " ")[1:]
+				//fmt.Printf("%s %v\n", cmd, cmdStrList)
 				cmdCancelCtx, cmdCancelFunc := context.WithCancel(mainCtx)
 				defer cmdCancelFunc()
-				var cmdPrefix string
-				if cmdStrList[0][0] == '/' {
-					cmdPrefix = ""
+				//var args string
+				var c *exec.Cmd
+				if len(cmdStrList) > 0 {
+					c = exec.CommandContext(cmdCancelCtx, cmd, strings.Join(cmdStrList, " "))
 				} else {
-					cmdPrefix = "../"
+					c = exec.CommandContext(cmdCancelCtx, cmd)
 				}
-
-				c := exec.CommandContext(cmdCancelCtx, cmdPrefix+cmdStrList[0], cmdArgs...)
 
 				//var terr error
 				//var workDir string
@@ -515,12 +511,12 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 	// short-lived jobs, we might not mark all of them as completed.
 	// Meh. Not worth an O(n^2) operation.
 	fixed = orig
-	
+
 	// As described above, prevent excessive processing for live web view
 	if horizon > 255 {
-			horizon = 255
+		horizon = 255
 	}
-	
+
 	l := len(fixed) - 1
 	if l > 1 {
 		if l > horizon {
@@ -587,7 +583,7 @@ func main() {
 	mainCtx := context.Background()
 	jobCancellers = make(map[string]func())
 
-	logfile, _ := os.Create("run.log")
+	logfile, _ := os.Create(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 
 	log.SetOutput(logfile)
 	log.Printf("[bacillus %s startup] <a href='/'>usage</a>\n", appVer)
@@ -617,7 +613,7 @@ func main() {
 				<body>
 				`)
 
-		rl, _ := ioutil.ReadFile("run.log")
+		rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 
 		// Split log into header and the rest, with endpoints
 		// at top and events below, so as log gets longer user
@@ -738,8 +734,10 @@ func main() {
   [&check;] Job has completed with OK(0) status - click to view output
   <span style='background-color:red'>[!]</span> Job has exited with nonzero status - click to view output
 
-  .. that's about it. Happy build-automating!
-  </pre>
+  .. that's about it.
+     Happy Build Automating, DevOps-ing, or whatever it's called these days...
+	 </pre>
+	 <span style='font-size: 8px; position: fixed; bottom: 0; left: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 							`)
 		io.WriteString(w, `
 							</body>
