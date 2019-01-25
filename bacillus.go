@@ -722,7 +722,7 @@ func main() {
 							`)
 		io.WriteString(w, `
   <pre>
-  bacill<&mu;>s <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
+  bacill&mu;s <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
   
   <a href='/runlog'>/runlog</a>: main log/activity view
   <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
