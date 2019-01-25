@@ -81,8 +81,8 @@ Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as b
 
 [terminal A - CI server]
 ```
-$ cd go/src/blitter.com/go/bacillus
-$ go install . && ./example.sh
+$ cd &lt;installation_dir&gt;
+$ ./bacillus_launch.sh
 ```
 
 [terminal B - client event test]

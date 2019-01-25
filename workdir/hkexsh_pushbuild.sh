@@ -29,9 +29,10 @@ for i in $(seq 1 20); do echo Doing stuff ${i}...; sleep 1; done
 make all
 echo "--Done--"
 ## For demonstration, succeed or fail based on BACILLUS_JOBID's evenness
+## NOTE the #0 hack in expansion below: sometimes Go's TempDir() gives a dir with leading zero
 if [ $(( ${BACILLUS_JOBID#0} % 2 )) -eq 0 ]; then
   echo "Succeeded."
-  echo "artifacts for a successful run should go here." >${BACILLUS_ARTFDIR}/artifacts.txt
+  echo "This is an artifact from a successfull run of hkexsh_pushbuild.sh" >${BACILLUS_ARTFDIR}/artifacts.txt
   exit 0
 else
   echo "FAILED!"
