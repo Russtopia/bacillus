@@ -81,7 +81,7 @@ Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as b
 
 [terminal A - CI server]
 ```
-$ cd &lt;installation_dir&gt;
+$ cd <installation_dir>
 $ ./bacillus_launch.sh
 ```
 
