@@ -61,10 +61,10 @@
 # $ curl -s -X POST -d [json] localhost:9990/gogs/<jobTag>
 
 ## If better log rotation is desired, use logrotate.
-if [ -e run.log ]; then
-  echo "Rolling previous log to run.log.bak"
-  mv -f run.log run.log.bak
-fi
+#if [ -e run.log ]; then
+#  echo "Rolling previous log to run.log.bak"
+#  mv -f run.log run.log.bak
+#fi
 
 ## Tagging jobs for periodic reaping
 ##

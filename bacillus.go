@@ -233,10 +233,12 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	consStat := lines[0]
 	fullConsLink := lines[1]
+	//jobTag := lines[2]
+
 	var tail []string
 
 	var stat rune
-	var code int //TODO: use to determine red failure marker?
+	var code int
 	n, e := fmt.Sscanf(consStat, "[%c %03d]", &stat, &code)
 	_ = n
 	if l > 0 {
@@ -389,13 +391,24 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s", workDir, jobOpts, jobID)))
 					c.Env = append(c.Env, jobEnv...)
 
+					// JOB STATUS METADATA PREPENDED TO console.out
 					// Job output status is encoded in first line of output log.
 					// [1 2]
 					//  1: state: r = running f = finished
 					//  2: completion status: <n> = exit status, 0 = success; else failure
 					//     status uses UNIX shell exit status convention (base 10 0-255))
+					//
+					// Line 2 is the relative path of the console.log file itself, used to
+					// build a link to it for the /fullconsole/ endpoint link
+					//
+					// Line 3 is the JOBTAG of the job generating this console.out, used
+					// by the top "/" endpoint to show recently active jobs (ie., those with
+					// workdirs still present)
+					//
 					_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
 					_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
+					_, err = fmt.Fprintf(c.Stdout, "%s\n", jobTag)
+
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -416,8 +429,6 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 							indentStr,
 							jobTag, jobID,
 							jobID)
-						//log.Printf("%s[console log:<a href=\"%s\">%s</a>]\n", indentStr,
-						//	workerOutputRelPath, workerOutputRelPath)
 
 						// Spawn handler for /cancel/<jobID>
 						http.HandleFunc(fmt.Sprintf("/cancel/%s", jobID),
@@ -469,9 +480,6 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 						//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
 					}
 
-					// TODO: exitStatus output to.. job.status ? (int exitStatus)
-					// TODO: console log endpoint check for existence of job.status;
-
 					if werr == nil {
 						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
 							jobID, instColour,
@@ -487,10 +495,6 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 							jobTag, jobID,
 							jobOpts, jobID,
 							werr)
-					}
-					if strings.Contains(strings.Join(c.Env, " "),
-						"BACILLUS_REMOVE_WORKDIR") {
-						_ = os.RemoveAll(workDir)
 					}
 				}
 			}()
@@ -526,9 +530,7 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 		}
 
 		for idx := l; idx > horizon; idx-- {
-			//fmt.Println("idx:", idx, "l:", l, "horizon:", horizon)
 			if strings.Count(fixed[idx], "<!--COMPLETION-->") != 0 {
-				//fmt.Println("found COMPLETION")
 				// Found a completed job. Seek a few entries back
 				// to mark the job launch stmt, hiding the in-progress
 				// and cancel links within.
@@ -542,7 +544,6 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 				if jidStart != -1 && jidEnd != -1 {
 					jobID = fixed[idx][jidStart:jidEnd]
 					jobTag := "<!--JOBID:" + jobID + ":JOBID-->"
-					//fmt.Printf("found %s\n", jobTag)
 					for seekIdx := idx - 1; seekIdx >= 0 && seekIdx > horizon; seekIdx-- {
 						// NOTE we're modifying the 'live' view of
 						// the logfile, not the direct data on disk, so
@@ -550,7 +551,6 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 						// (If this func is optimized to be zero-copy
 						//  however, it might need to be.)
 						if strings.Contains(fixed[seekIdx], jobTag) {
-							//fmt.Println("found jobTag, patching")
 							fixed[seekIdx] = strings.Replace(fixed[seekIdx],
 								"display:inline", "display:none", -1)
 							if indStyle == "both" || indStyle == "indent" {
@@ -566,12 +566,19 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 			}
 		}
 	}
-	//fmt.Println(fixed)
 	return fixed
 }
 
+//func getRecentJobRuns() (list []string) {
+//	// for f in $(find workdir -type f -name "console.out"); do head -3 $f | tail -1; done
+//	return
+//}
+
 func main() {
+	var createRunlog bool
+
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
+	flag.BoolVar(&createRunlog, "c", false, "set true/1 to create new run.log, overwriting old one")
 	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
 	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
@@ -583,7 +590,15 @@ func main() {
 	mainCtx := context.Background()
 	jobCancellers = make(map[string]func())
 
-	logfile, _ := os.Create(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
+	var logfile *os.File
+	var cerr error
+	runLogFileName := fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1])
+	if !createRunlog {
+		logfile, cerr = os.OpenFile(runLogFileName, os.O_RDWR, 0644)
+	}
+	if cerr != nil || createRunlog {
+		logfile, _ = os.Create(runLogFileName)
+	}
 
 	log.SetOutput(logfile)
 	log.Printf("[bacillus %s startup] <a href='/'>usage</a>\n", appVer)
