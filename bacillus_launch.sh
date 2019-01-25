@@ -83,6 +83,6 @@ fi
 ##
 
 bacillus -a=:9990 -rl=30 \
- onPush_hkexsh_build::FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
+ onPush_hkexsh_build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
  onPush_bacillus_artifact:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh" \
  onPush_bacillus_env:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"env"
