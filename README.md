@@ -16,10 +16,12 @@ bacillus is a single static binary with almost zero external configuration.
 
 ### Building and Installing
 
+```
 [Login as user account that will run bacillus]
 [Install recent version of Go, v1.11 or newer recommended]
 $ git clone https://gogs.blitter.com/Russtopia/bacillus
 $ go install .
+```
 
 
 ## Configuration
@@ -72,7 +74,7 @@ To keep different categories of jobs logically separated and more manageable, co
 ## TODOs
 * TODO: Add cmdline option to specify location of run.log (currently bacillus launch dir)
 * Screenshots
-* Add a /jobstatus endpoint, showing a single-line status summary of all recent jobs w/status indicators (ie., brief version of /runlog and with only running and recently-completed jobs; or make /runlog do this and add a _full_log_ link at top to see complete logs)
+* Devise a way to allow retention of 'X' recent builds per job (currently only time-based retention)
 
 ## Example Run
 Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacillus itself)
