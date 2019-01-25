@@ -16,24 +16,58 @@ bacillus is a single static binary with almost zero external configuration.
 
 ### Building and Installing
 
+[Login as user account that will run bacillus]
+[Install recent version of Go, v1.11 or newer recommended]
+$ git clone https://gogs.blitter.com/Russtopia/bacillus
 $ go install .
+
 
 ## Configuration
 
-bacillus, being a simple tool, has little configuration. The repository contains
+bacillus, being a simple tool, has little configuration. Almost all configuration is encapsulated in the tool's invocation via command-line, and in the worker scripts themselves.
+
+## Structure
+
+Sample installation tree
+
+```
+/home/account/
+             /bacillus/             (project tree)
+                      /bacillus     (main binary)
+                      /workdir/     (home of job scripts and running job workspaces)
+                      /artifacts/   (where jobs place their 'artifacts' during/after run)
+                      /images/      (image assets used by main binary)
+```
+
+## Tracking of Jobs
+
+bacillus launches jobs as child processes, waiting on their exit and tagging their main stdout/stderr output, named 'console.out' within each worker's workspace (eg., workdir/bacillus_&lt;JOBID&gt;). No external state or other meta-data is maintained, so there is no way to get out of sync with spawned jobs.
+
+
+The repository contains
 two sample scripts:
 
-* example.sh - launch bacillus with a few demo endpoints
-* workdir/hkexsh_pushbuild.sh - build job for an example external project
-
-The second script above, workdir/hkexsh_pushbuild.sh, is intended to be triggered by either a git hook or a webhook such as those provided by repo managers such as gogs.io. The sample post-receive git hook script in workdir/ is meant to be placed within the external project's git repo, and as such is not technically part of the bacillus configuration itself.
+* bacillus_launch.sh - launch bacillus with a few demo endpoints
+* workdir/artifact.sh - simple example that just does 'work' for a short time and leaves artifacts
+* workdir/hkexsh_pushbuild.sh - a slightly more realistic build job for an external project
+* workdir/hkexsh_pushbuild.sh - sample git post-receive hook used to trigger the above endpoint
 
 In summary, to perform build/CI tasks with bacillus, one should
 
 * add a git/web hook to external git repositories and/or git repo web servers
 * add job scripts to perform the intended tasks to some location known to bacillus
 * define endpoints, job workdir and job-specific env vars for each to pass
-  to bacillus (see example.sh)
+  to bacillus (see bacillus_launch.sh)
+
+## Storage
+
+The design of bacillus follows the Unix tool philosophy: 'do one thing and do it well'. As such, scheduling of repeated jobs and reaping of old job workspaces/artifacts to save disk space, archiving etc. are left to external tools (consider cron, anacron, rsync, etc.). An example cron job to reap old workspaces and artifacts is described within the 'bacillus_launch.sh' script.
+
+
+## Larger Installations
+
+To keep different categories of jobs logically separated and more manageable, consider grouping similar jobs together and running them from separate instances of the 'bacillus_launch' script (ie., daily builds vs. weekly builds vs. test jobs ...). Just change the endpoints specified in each copy of the launch script and the server port so each instance has its own web pages. They can all run within the same install tree or separately, the tool does not enforce any specific policy.
+
 
 ## TODOs
 * TODO: Add cmdline option to specify location of run.log (currently bacillus launch dir)
@@ -55,13 +89,4 @@ $ go install . && ./example.sh
 $ curl -s http://localhost:9990/blind/onPush_hkexsh_build
 ```
 
-Observe execution on localhost:9990/runlog
-
-## Controlling Jobs
-* Endpoints in the /runlog view have a [>] beside them; you can launch jobs manually by clicking on these. The launched job status will appear in /runlog on the next page refresh (10s).
-* When a job is launched, it has a [C] beside the launch entry. Clicking on this will cancel the job.
-* When a job has finished, it will either have a [&check;] or [!] in red, either of which is a clickable link to the job's artifacts directory (jobs by convention should place all of their 'artifacts' in ${BACILLUS_ARTFDIR} which points to this location).
-* To view a job's progress (its 'live console'), click on the jobID link.
-* Running jobs show, in their live console page, the most recent output lines and, if the output grows large enough, a link to the full console output (at the moment) at the top. A coloured spinner/status bubble is at the bottom of the live console indicating the job's running or completion status.
-* When a job completes, the spinner changes to an exit status code indicator and the live console stops refreshing.
-
+Visit tool main page on localhost:&lt;port&gt;/runlog (see bacillus_launch.sh for port)
