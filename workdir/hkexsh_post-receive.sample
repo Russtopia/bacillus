@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-"/home/git/go/src/github.com/gogs/gogs/gogs" hook --config='/home/git/go/src/github.com/gogs/gogs/custom/conf/app.ini' post-receive
+
+"/home/git/go/src/github.com/gogs/gogs/gogs" hook --config='/home/git/go/src/github.com/gogs/gogs/c$
 
 echo "--"
 echo "push hook"
 echo "--"
 
-/usr/bin/curl -s http://192.168.9.102:9990/blind/onPush_hkexsh_build
-
+## NOTE In my setup bacillus is behind a reverse proxy, 'bacillus.blitter.com'
+## and therefore must be addressed via https://bacillus.blitter.com/
+## though it runs http:// on port 9990.
+/usr/bin/curl -s https://bacillus.blitter.com/blind/onPush_hkexsh_build
