@@ -46,6 +46,19 @@ var (
 	jobCancellers map[string]func()
 )
 
+// There is a smattering of HTML and JS in this project, programmatically
+// generated.
+// No, I did not use templates.
+// Yes, I may rewrite in the future to do so, but don't hold your breath.
+// I didn't design this thing up-front, I wrote it to scratch an itch.
+// That's what 'agile design' gets you :p
+
+func getBodyBgndHTMLFrag() string {
+		return ` style='background-image: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%), url("/images/bacillus.jpg"); background-size: cover;'`
+}
+
+// getGoBackHeaderJS() returns a JS fragment to make a page go back after a
+// short delay.
 func getGoBackHeaderJS(ms string) string {
 	return fmt.Sprintf(`
 <script>
@@ -319,7 +332,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					<head>`+
 				getGoBackHeaderJS("3000")+`
 					</head>
-                    <body>
+                    <body` + getBodyBgndHTMLFrag() + `>
 					`)
 			io.WriteString(w, fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag))
 			io.WriteString(w, `
@@ -438,7 +451,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					<head>`+
 									getGoBackHeaderJS("3000")+`
 					</head>
-					<body>
+					<body ` + getBodyBgndHTMLFrag() + `>
 					`)
 								if jobCancellers[jobID] != nil {
 									jobCancellers[jobID]()
@@ -574,6 +587,85 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 //	return
 //}
 
+func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+<html>
+<head>
+  <meta http-equiv="refresh" content="5">`+
+		getRunLogCSS()+`
+</head>
+<body ` + getBodyBgndHTMLFrag() + `>
+	`)
+
+	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
+
+	// Split log into header and the rest, with endpoints
+	// at top and events below, so as log gets longer user
+	// can still see important bits.
+	lines := strings.Split(string(rl), "--BACILLUS READY--")
+	tailLines := strings.Split(lines[1], "\n")
+	tailCount := len(tailLines)
+
+	// Scan backwards in log for completion msgs, match with
+	// preceding launch msgs to un-mark the in-progress and cancel icons there
+	// (only 'live' view)
+	tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
+
+	io.WriteString(w, "<pre style='background-color: skyblue;'>")
+	io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
+	io.WriteString(w, "</pre>")
+
+	io.WriteString(w, "<pre>")
+	if runLogTailLines == 0 || tailCount < runLogTailLines {
+		io.WriteString(w, strings.Join(tailLines, "\n"))
+	} else {
+		io.WriteString(w, strings.Join(tailLines[tailCount-runLogTailLines:], "\n"))
+	}
+	io.WriteString(w, "</pre>")
+	//
+
+	io.WriteString(w, `
+</body>
+</html>
+    `)
+}
+
+func rootPageHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+<html>
+<head>
+</head>
+  <body ` + getBodyBgndHTMLFrag() + `>
+		`)
+	io.WriteString(w, `
+  <pre>
+  bacill&mu;s <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
+  
+  <a href='/runlog'>/runlog</a>: main log/activity view
+  <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
+
+  LEGEND
+  [&rtrif;] Start a job manually
+  [&cross;] Cancel a running job
+  [&ccupssm;] View completed job artifacts
+  [&ccups;] View partial artifacts for a failed job
+  [&acd;] Job is running - click to view in-progress output
+  [&check;] Job has completed with OK(0) status - click to view output
+  <span style='background-color:red'>[!]</span> Job has exited with nonzero status - click to view output
+
+  .. that's about it.
+     Happy Build Automating, DevOps-ing, or whatever it's called these days...
+  </pre>
+  <span style='font-size: 8px; position: fixed; bottom: 0; left: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
+	`)
+	io.WriteString(w, `
+</body>
+</html>
+	`)
+}
+
 func main() {
 	var createRunlog bool
 
@@ -601,65 +693,13 @@ func main() {
 	}
 
 	log.SetOutput(logfile)
-	log.Printf("[bacillus %s startup] <a href='/'>usage</a>\n", appVer)
+	log.Printf("[bacillus %s startup] <a href='/usage'>usage</a>\n", appVer)
 	log.Printf("[listening on %s, type %s]\n", addrPort, hookStd)
 
 	cmdMap := make(map[string]string)
 
 	//log.Printf("Registering handler for /runlog page.\n")
-	http.HandleFunc("/runlog", func(w http.ResponseWriter, r *http.Request) {
-		//if statUseUnicode {
-		//	checkSeq = "o"
-		//	playSeq = string([]byte{'&','#'})
-		//	errSeq = "X"
-		//} else {
-		//	checkSeq = "o"
-		//	playSeq = ">"
-		//	errSeq = "X"
-		//}
-
-		w.Header().Set("Content-type", "text/html")
-		io.WriteString(w, `
-				<html>
-				<head>
-				<meta http-equiv="refresh" content="5">`+
-			getRunLogCSS()+`
-				</head>
-				<body>
-				`)
-
-		rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
-
-		// Split log into header and the rest, with endpoints
-		// at top and events below, so as log gets longer user
-		// can still see important bits.
-		lines := strings.Split(string(rl), "--BACILLUS READY--")
-		tailLines := strings.Split(lines[1], "\n")
-		tailCount := len(tailLines)
-
-		//TODO: scan backwards in log for completion msgs, match with
-		// preceding launch msgs to un-mark the in-progress and cancel icons there
-		tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
-
-		io.WriteString(w, "<pre style='background-color: skyblue;'>")
-		io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
-		io.WriteString(w, "</pre>")
-
-		io.WriteString(w, "<pre>")
-		if runLogTailLines == 0 || tailCount < runLogTailLines {
-			io.WriteString(w, strings.Join(tailLines, "\n"))
-		} else {
-			io.WriteString(w, strings.Join(tailLines[tailCount-runLogTailLines:], "\n"))
-		}
-		io.WriteString(w, "</pre>")
-		//
-
-		io.WriteString(w, `
-				</body>
-				</html>
-				`)
-	})
-
+	http.HandleFunc("/runlog", runLogPageHandler)
 	jobHomeDir = "workdir"
 	// Each non-switch argument is taken to be an endpoint (job) descriptor
 	// Syntax of an endpoint:
@@ -727,40 +767,7 @@ func main() {
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
 
 	// And finally, the root fallback to give help on defined endpoints.
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-type", "text/html")
-		io.WriteString(w, `
-							<html>
-							<head>
-							</head>
-							<body style='background-image: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%), url("/images/bacillus.jpg"); background-size: cover;'>
-							`)
-		io.WriteString(w, `
-  <pre>
-  bacill&mu;s <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
-  
-  <a href='/runlog'>/runlog</a>: main log/activity view
-  <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
-  
-  LEGEND
-  [&rtrif;] Start a job manually
-  [&cross;] Cancel a running job
-  [&ccupssm;] View completed job artifacts
-  [&ccups;] View partial artifacts for a failed job
-  [&acd;] Job is running - click to view in-progress output
-  [&check;] Job has completed with OK(0) status - click to view output
-  <span style='background-color:red'>[!]</span> Job has exited with nonzero status - click to view output
-
-  .. that's about it.
-     Happy Build Automating, DevOps-ing, or whatever it's called these days...
-	 </pre>
-	 <span style='font-size: 8px; position: fixed; bottom: 0; left: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
-							`)
-		io.WriteString(w, `
-							</body>
-							</html>
-							`)
-	})
+	http.HandleFunc("/", rootPageHandler)
 
 	//go func() {
 	//	log.Fatal(http.ListenAndServe(":9991", http.FileServer(http.Dir(jobHomeDir))))
