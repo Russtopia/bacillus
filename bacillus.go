@@ -13,7 +13,9 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"net/http"
+
+	"blitter.com/go/http" // exactly net/http, but with hook to stylize fs.go::dirList()
+	//"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +56,7 @@ var (
 // That's what 'agile design' gets you :p
 
 func getBodyBgndHTMLFrag() string {
-		return ` style='background-image: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%), url("/images/bacillus.jpg"); background-size: cover;'`
+	return ` style='background-image: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%), url("/images/bacillus.jpg"); background-size: cover;'`
 }
 
 // getGoBackHeaderJS() returns a JS fragment to make a page go back after a
@@ -332,7 +334,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					<head>`+
 				getGoBackHeaderJS("3000")+`
 					</head>
-                    <body` + getBodyBgndHTMLFrag() + `>
+                    <body`+getBodyBgndHTMLFrag()+`>
 					`)
 			io.WriteString(w, fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag))
 			io.WriteString(w, `
@@ -451,7 +453,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					<head>`+
 									getGoBackHeaderJS("3000")+`
 					</head>
-					<body ` + getBodyBgndHTMLFrag() + `>
+					<body `+getBodyBgndHTMLFrag()+`>
 					`)
 								if jobCancellers[jobID] != nil {
 									jobCancellers[jobID]()
@@ -595,7 +597,7 @@ func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
   <meta http-equiv="refresh" content="5">`+
 		getRunLogCSS()+`
 </head>
-<body ` + getBodyBgndHTMLFrag() + `>
+<body `+getBodyBgndHTMLFrag()+`>
 	`)
 
 	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
@@ -637,7 +639,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <html>
 <head>
 </head>
-  <body ` + getBodyBgndHTMLFrag() + `>
+  <body `+getBodyBgndHTMLFrag()+`>
 		`)
 	io.WriteString(w, `
   <pre>
@@ -751,6 +753,10 @@ func main() {
 	// jobs and devs. Jobs are responsible for its proper use.
 	artifactBaseDir, aerr := filepath.Abs("artifacts")
 	if aerr == nil {
+		// Install custom styling for dir pages
+		// This requires blitter.com/go/http until such capability is merged
+		// into base go net/http ...
+		installFileServerStyling()
 		http.Handle("/artifacts/",
 			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
 	}
@@ -774,4 +780,32 @@ func main() {
 	//}()
 
 	log.Fatal(http.ListenAndServe(addrPort, nil))
+}
+
+func installFileServerStyling() {
+	http.SetDirListDecorators(_myDirListPre, _myDirListE, _myDirListPost)
+}
+
+func _myDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
+	hdrs = make(map[string]string)
+	hdrs["Content-Type"] = "text/html; charset=utf-8"
+	hdrs["X-Foo"] = "bacillus dir listing"
+	preamble = `
+	<head>
+	<style>
+	a:visited { color: green; }
+	</style>
+	</head>
+	<body>` + "this is body" + `/>`
+	<pre style='background-color: grey'>---- bacill&mu;s directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
+	<pre>`
+	return
+}
+
+func _myDirListE() string {
+		return "(no files ...)"
+}
+
+func _myDirListPost() string {
+	return "</pre></body></html>\n"
 }
