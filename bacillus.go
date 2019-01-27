@@ -55,6 +55,10 @@ var (
 // I didn't design this thing up-front, I wrote it to scratch an itch.
 // That's what 'agile design' gets you :p
 
+func getFavIcon() string {
+	return `<link rel="icon" type="image/jpg" href="/images/logo.jpg"/>`
+}
+
 func getBodyBgndHTMLFrag() string {
 	return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus.jpg"); background-size: cover;'`
 }
@@ -213,7 +217,7 @@ func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, "<html><head></head><body><pre>\n")
+	io.WriteString(w, "<html><head>"+getFavIcon()+"</head><body><pre>\n")
 	w.Write(runLog)
 	io.WriteString(w, "</pre></body</html>\n")
 }
@@ -279,7 +283,9 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 <html>
 <head>
-`+getRefreshJS(stat)+
+`+
+		getFavIcon()+
+		getRefreshJS(stat)+
 		getStyleCSS()+
 		getCompatJS()+
 		getSpinnerJS(stat, codeColor, statWord)+
@@ -332,6 +338,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 			io.WriteString(w, `
 					<html>
 					<head>`+
+				getFavIcon()+
 				getGoBackHeaderJS("3000")+`
 					</head>
                     <body`+getBodyBgndHTMLFrag()+`>
@@ -451,6 +458,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 								io.WriteString(w, `
 					<html>
 					<head>`+
+									getFavIcon()+
 									getGoBackHeaderJS("3000")+`
 					</head>
 					<body `+getBodyBgndHTMLFrag()+`>
@@ -594,7 +602,8 @@ func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 <html>
 <head>
-  <meta http-equiv="refresh" content="5">`+
+<meta http-equiv="refresh" content="5">`+
+		getFavIcon()+
 		getRunLogCSS()+`
 </head>
 <body `+getBodyBgndHTMLFrag()+`>
@@ -613,7 +622,8 @@ func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
 	// preceding launch msgs to un-mark the in-progress and cancel icons there
 	// (only 'live' view)
 	tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
-
+	
+	io.WriteString(w, "<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s "+appVer+"</a></pre>\n")
 	io.WriteString(w, "<pre style='background-color: skyblue;'>")
 	io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
 	io.WriteString(w, "</pre>")
@@ -637,13 +647,14 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
 <html>
-<head>
+<head>`+
+		getFavIcon()+`
 </head>
   <body `+getBodyBgndHTMLFrag()+`>
 		`)
 	io.WriteString(w, `
   <pre>
-  bacill&mu;s <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
+  bacill&mu;s `+appVer+` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
   
   <a href='/runlog'>/runlog</a>: main log/activity view
   <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
@@ -752,13 +763,11 @@ func main() {
 	// Make a filesystem available for dir/file storage & retrieval by
 	// jobs and devs. Jobs are responsible for its proper use.
 	artifactBaseDir, aerr := filepath.Abs("artifacts")
+	_ = artifactBaseDir
 	if aerr == nil {
-		// Install custom styling for dir pages
-		// This requires blitter.com/go/http until such capability is merged
-		// into base go net/http ...
-		installFileServerStyling()
-		http.Handle("/artifacts/",
-			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
+		//		http.Handle("/artifacts/",
+		//			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
+		http.Handle("/artifacts/", http.StripPrefix("/artifacts/", FileServer{Root: "/artifacts", Handler: http.FileServer(http.Dir("artifacts"))}))
 	}
 
 	http.Handle("/images/",
@@ -780,29 +789,4 @@ func main() {
 	//}()
 
 	log.Fatal(http.ListenAndServe(addrPort, nil))
-}
-
-func installFileServerStyling() {
-	http.SetDirListDecorators(_myDirListPre, _myDirListE, _myDirListPost)
-}
-
-func _myDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
-	hdrs = make(map[string]string)
-	hdrs["Content-Type"] = "text/html; charset=utf-8"
-	//hdrs["X-Foo"] = "bacillus dir listing"
-	preamble = `
-	<head>
-	</head>
-	<body ` + getBodyBgndHTMLFrag() + `>
-	<pre style='background-color: grey'>bacill&mu;s ---- directory:` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
-	<pre>`
-	return
-}
-
-func _myDirListE() string {
-		return "(no files ...)"
-}
-
-func _myDirListPost() string {
-	return "</pre></body></html>\n"
 }
