@@ -32,7 +32,7 @@ echo "--Done--"
 ## NOTE the #0 hack in expansion below: sometimes Go's TempDir() gives a dir with leading zero
 if [ $(( ${BACILLUS_JOBID#0} % 2 )) -eq 0 ]; then
   echo "Succeeded."
-  echo "This is an artifact from a successfull run of hkexsh_pushbuild.sh" >${BACILLUS_ARTFDIR}/artifacts.txt
+  echo "This is an artifact from a successful run of hkexsh_pushbuild.sh" >${BACILLUS_ARTFDIR}/artifacts.txt
   exit 0
 else
   echo "FAILED!"
