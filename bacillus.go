@@ -14,8 +14,7 @@ import (
 	"log"
 	"math/rand"
 
-	"blitter.com/go/http" // exactly net/http, but with hook to stylize fs.go::dirList()
-	//"net/http"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -622,7 +621,7 @@ func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
 	// preceding launch msgs to un-mark the in-progress and cancel icons there
 	// (only 'live' view)
 	tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
-	
+
 	io.WriteString(w, "<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s "+appVer+"</a></pre>\n")
 	io.WriteString(w, "<pre style='background-color: skyblue;'>")
 	io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
@@ -767,7 +766,10 @@ func main() {
 	if aerr == nil {
 		//		http.Handle("/artifacts/",
 		//			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
-		http.Handle("/artifacts/", http.StripPrefix("/artifacts/", FileServer{Root: "/artifacts", Handler: http.FileServer(http.Dir("artifacts"))}))
+		http.Handle("/artifacts/",
+			http.StripPrefix("/artifacts/",
+				FileServer{Root: "/artifacts",
+					Handler: http.FileServer(http.Dir("artifacts")) } ))
 	}
 
 	http.Handle("/images/",
