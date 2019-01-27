@@ -56,7 +56,7 @@ var (
 // That's what 'agile design' gets you :p
 
 func getBodyBgndHTMLFrag() string {
-	return ` style='background-image: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%), url("/images/bacillus.jpg"); background-size: cover;'`
+	return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus.jpg"); background-size: cover;'`
 }
 
 // getGoBackHeaderJS() returns a JS fragment to make a page go back after a
@@ -789,15 +789,12 @@ func installFileServerStyling() {
 func _myDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
 	hdrs = make(map[string]string)
 	hdrs["Content-Type"] = "text/html; charset=utf-8"
-	hdrs["X-Foo"] = "bacillus dir listing"
+	//hdrs["X-Foo"] = "bacillus dir listing"
 	preamble = `
 	<head>
-	<style>
-	a:visited { color: green; }
-	</style>
 	</head>
-	<body>` + "this is body" + `/>`
-	<pre style='background-color: grey'>---- bacill&mu;s directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
+	<body ` + getBodyBgndHTMLFrag() + `>
+	<pre style='background-color: grey'>bacill&mu;s ---- directory:` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
 	<pre>`
 	return
 }
