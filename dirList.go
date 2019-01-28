@@ -1,18 +1,23 @@
-/* -*- go -*-
- *  $RCSfile$ $Revision$ : $Date$ : $Author$
- *
- *  Description
- *
- *  Notes
- *
- **************
- *
- *  Copyright (c) 2019 Russtopia Labs. All Rights Reserved.
- *
- * This document may not, in whole or in part, be copied, photocopied,
- * reproduced, translated, or reduced to any electronic medium or machine
- * readable form without prior written consent from Russtopia Labs.
- */
+// Helper routines to style the otherwise-plain directory
+// listings served out by net/http.FileServer().
+//
+// Thanks to Tamás Gulácsi for the tip on this
+// patch-free method.
+//
+// Originally I came up with a patch to the actual stdlib
+// net/http/fs.go to add hooks one could set to style dirs,
+// adding the capability directly to http/fs.go's dirList()
+// which is un-exported. That's a bit hacky (and not
+// goroutine-friendly, eg. the hooks are global to all
+// threads in the program). Tamás' method is much nicer.
+//
+// One gotcha that took me a while to discover: the HTTP standard
+// expects the server to do a local redirect for URIs requesting
+// directories without a trailing '/', adding them on. This is
+// required for relative links to work from such URIs.
+// https://wiki.apache.org/httpd/DirectoryListings
+//
+
 package main
 
 import (
@@ -21,6 +26,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -31,28 +37,49 @@ type FileServer struct {
 	http.Handler
 }
 
+// Aha! A bug in this, as opposed to the core net/http plain FileServer(),
+// where links in a dir listing are wrong if the request does not have
+// a trailing '/', is due to expectation that the server will send a
+// redirect adding '/'. See
+// https://wiki.apache.org/httpd/DirectoryListings
+// 'Trailing Slash Redirection'
+//
 func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rootpath, _ := filepath.Abs(strings.TrimPrefix(fs.Root, "/"))
-	fmt.Println("rootpath:", rootpath)
-
-	fmt.Println("url:", r.URL)
 	upath := r.URL.EscapedPath()
-	//upath = path.Clean(r.URL.Path)
-	fmt.Println("upath:", upath)
+	//upath := path.Clean(r.URL.Path)
 
 	var fullpath string
 	fullpath = rootpath
 	if upath != "." {
 		fullpath = fmt.Sprintf("%s%c%s", rootpath, os.PathSeparator, upath)
-		fmt.Println("abspath:", fullpath)
 	}
 
 	if fs, ferr := os.Stat(fullpath); ferr == nil && fs.Mode().IsDir() {
-		fmt.Printf("dirList(w, r, %s, %s)\n", fullpath, upath)
+		// IFF upath isn't the root of our virtual FileServer,
+		// redirect URIs specifying dirs that don't end in a slash.
+		// https://wiki.apache.org/httpd/DirectoryListings
+		if upath != "" {
+			url := r.URL.Path
+			if url[len(url)-1] != '/' {
+				localRedirect(w, r, path.Base(url)+"/")
+				return
+			}
+		}
 		dirList(w, r, fullpath, upath)
 		return
 	}
 	fs.Handler.ServeHTTP(w, r)
+}
+
+// localRedirect gives a Moved Permanently response.
+// It does not convert relative paths to absolute paths like Redirect does.
+func localRedirect(w http.ResponseWriter, r *http.Request, newPath string) {
+	if q := r.URL.RawQuery; q != "" {
+		newPath += "?" + q
+	}
+	w.Header().Set("Location", newPath)
+	w.WriteHeader(http.StatusMovedPermanently)
 }
 
 var htmlReplacer = strings.NewReplacer(
@@ -66,7 +93,6 @@ var htmlReplacer = strings.NewReplacer(
 )
 
 func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
-	fmt.Println("dir:", dir)
 	f, err := os.Open(dir)
 	if err != nil {
 		log.Printf("http: error reading directory: %v", err)
@@ -99,17 +125,13 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 	} else {
 		for _, d := range dirs {
 			name := d.Name()
-			fmt.Println("name:", name)
-
 			if d.IsDir() {
 				name += "/"
-				fmt.Println("name(/):", name)
 			}
 			// name may contain '?' or '#', which must be escaped to remain
 			// part of the URL path, and not indicate the start of a query
 			// string or fragment.
 			url := url.URL{Path: name}
-			fmt.Println("url.String():", url.String())
 			fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"%s\">%s</a>\n", url.String(), htmlReplacer.Replace(name))
 		}
 	}
