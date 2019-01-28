@@ -758,6 +758,11 @@ func main() {
 	}
 
 	log.Printf("--BACILLUS READY--\n")
+	// Seek to end in case we're reusing this runlog to preserve previous
+	// entries (yeah it's cheesy and probably error-prone if server was
+			// killed during running jobs. Big deal, those entries
+			// wouldn't show completion anyhow).
+	logfile.Seek(0, 2)
 
 	// Make a filesystem available for dir/file storage & retrieval by
 	// jobs and devs. Jobs are responsible for its proper use.
