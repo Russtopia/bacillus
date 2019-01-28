@@ -503,14 +503,14 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					}
 
 					if werr == nil {
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
 							jobID, instColour,
 							workerOutputRelPath,
 							indentStr,
 							jobTag, jobID,
 							jobOpts, jobID)
 					} else {
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
 							jobID, instColour,
 							workerOutputRelPath,
 							indentStr,
@@ -760,8 +760,8 @@ func main() {
 	log.Printf("--BACILLUS READY--\n")
 	// Seek to end in case we're reusing this runlog to preserve previous
 	// entries (yeah it's cheesy and probably error-prone if server was
-			// killed during running jobs. Big deal, those entries
-			// wouldn't show completion anyhow).
+	// killed during running jobs. Big deal, those entries
+	// wouldn't show completion anyhow).
 	logfile.Seek(0, 2)
 
 	// Make a filesystem available for dir/file storage & retrieval by
@@ -772,7 +772,7 @@ func main() {
 		http.Handle("/artifacts/",
 			http.StripPrefix("/artifacts/",
 				FileServer{Root: "/artifacts",
-					Handler: http.FileServer(http.Dir("artifacts")) } ))
+					Handler: http.FileServer(http.Dir("artifacts"))}))
 	}
 
 	http.Handle("/images/",

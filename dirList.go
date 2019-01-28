@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -33,20 +32,25 @@ type FileServer struct {
 }
 
 func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	upath := path.Clean(r.URL.Path)
+	rootpath, _ := filepath.Abs(strings.TrimPrefix(fs.Root, "/"))
+	fmt.Println("rootpath:", rootpath)
+
+	fmt.Println("url:", r.URL)
+	upath := r.URL.EscapedPath()
+	//upath = path.Clean(r.URL.Path)
 	fmt.Println("upath:", upath)
-	abspath, aerr := filepath.Abs(filepath.Join(strings.TrimPrefix(fs.Root, "/")))
+
+	var fullpath string
+	fullpath = rootpath
 	if upath != "." {
-		abspath = fmt.Sprintf("%s%c%s", abspath, os.PathSeparator, upath)
-		fmt.Println("abspath:", abspath)
+		fullpath = fmt.Sprintf("%s%c%s", rootpath, os.PathSeparator, upath)
+		fmt.Println("abspath:", fullpath)
 	}
-	if aerr == nil {
-		if fi, err := os.Stat(abspath); err == nil && fi.Mode().IsDir() {
-			dirList(w, r, abspath, upath)
-			return
-		}
-	} else {
-		log.Println(aerr)
+
+	if fs, ferr := os.Stat(fullpath); ferr == nil && fs.Mode().IsDir() {
+		fmt.Printf("dirList(w, r, %s, %s)\n", fullpath, upath)
+		dirList(w, r, fullpath, upath)
+		return
 	}
 	fs.Handler.ServeHTTP(w, r)
 }
@@ -62,7 +66,7 @@ var htmlReplacer = strings.NewReplacer(
 )
 
 func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
-	//fmt.Println("dir:", dir)
+	fmt.Println("dir:", dir)
 	f, err := os.Open(dir)
 	if err != nil {
 		log.Printf("http: error reading directory: %v", err)
@@ -95,14 +99,16 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 	} else {
 		for _, d := range dirs {
 			name := d.Name()
+			fmt.Println("name:", name)
+
 			if d.IsDir() {
 				name += "/"
+				fmt.Println("name(/):", name)
 			}
 			// name may contain '?' or '#', which must be escaped to remain
 			// part of the URL path, and not indicate the start of a query
 			// string or fragment.
 			url := url.URL{Path: name}
-			fmt.Printf("url: %q\n", url)
 			fmt.Println("url.String():", url.String())
 			fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"%s\">%s</a>\n", url.String(), htmlReplacer.Replace(name))
 		}
