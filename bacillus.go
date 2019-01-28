@@ -769,8 +769,6 @@ func main() {
 	artifactBaseDir, aerr := filepath.Abs("artifacts")
 	_ = artifactBaseDir
 	if aerr == nil {
-		//		http.Handle("/artifacts/",
-		//			http.StripPrefix("/artifacts/", http.FileServer(http.Dir(artifactBaseDir))))
 		http.Handle("/artifacts/",
 			http.StripPrefix("/artifacts/",
 				FileServer{Root: "/artifacts",

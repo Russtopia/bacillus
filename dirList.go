@@ -34,13 +34,12 @@ type FileServer struct {
 
 func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	upath := path.Clean(r.URL.Path)
-	//fmt.Println("upath:", upath)
-	abspath, aerr := filepath.Abs(filepath.Join(fs.Root[1:]))
+	fmt.Println("upath:", upath)
+	abspath, aerr := filepath.Abs(filepath.Join(strings.TrimPrefix(fs.Root, "/")))
 	if upath != "." {
 		abspath = fmt.Sprintf("%s%c%s", abspath, os.PathSeparator, upath)
+		fmt.Println("abspath:", abspath)
 	}
-	//fmt.Println(aerr)
-	//fmt.Println("fs.Root:", fs.Root, "abspath:", abspath)
 	if aerr == nil {
 		if fi, err := os.Stat(abspath); err == nil && fi.Mode().IsDir() {
 			dirList(w, r, abspath, upath)
@@ -103,6 +102,8 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 			// part of the URL path, and not indicate the start of a query
 			// string or fragment.
 			url := url.URL{Path: name}
+			fmt.Printf("url: %q\n", url)
+			fmt.Println("url.String():", url.String())
 			fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"%s\">%s</a>\n", url.String(), htmlReplacer.Replace(name))
 		}
 	}
