@@ -88,7 +88,7 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 	fmt.Fprintf(w, preamble)
 
 	if upath != "." {
-		fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n")
+		fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
 	}
 	if len(dirs) == 0 {
 		fmt.Fprintf(w, usrDirListE())
@@ -125,7 +125,7 @@ func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
 }
 
 func usrDirListE() string {
-	return "\n(no files ...)"
+	return "(no files ...)"
 }
 
 func usrDirListPost() string {
