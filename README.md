@@ -6,68 +6,72 @@ bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L
 
 ## Rationale
 
-The goal of this project is to offer an extremely minimal Build Automation and
-Continuous Integration (CI) system, with zero dependencies on large
-frameworks, containers, etc.
+The goal of this project is to offer an *extremely* minimal Build Automation and Continuous Integration (CI) system with zero dependencies on large frameworks, VMs or containers. Its core features reflect those the author found essential while using, administering and customizing a more traditional, shall we say, 'butler-based' build automation system for a large dev team over multiple years; experience showed that a lot of 'the other stuff' was completely unnecessary, or better achieved by external tools.
 
-Existing automated build/CI systems such as Jenkins, buildbot, concourse, and so on are large and/or difficult to set up, with complex pre-built containers and/or entire bundles of packages, libraries and dependencies. bacill&mu;s is a single static binary with almost zero external configuration. Instead of taking one or (many) more evenings studying setup documentation, you can be up and running within minutes (assuming an existing golang installation on your server).
+bacill&mu;s is a single static binary with almost zero external configuration. With little to configure, one can be up and running within minutes. No containers, VMs, or DSLs (Domain-Specific Languages).
 
-bacill&mu;s is language-agnostic: any script or binary that can be launched from a Linux shell can also be launched by bacill&mu;s.
+It basically should run on a potato, if that potato runs Go, without breaking a sweat.
+
+bacill&mu;s is language-agnostic. Any script or binary that can be launched from a Linux shell can also be launched by bacill&mu;s. Job-specific behaviour can (must!) be implemented in whatever language(s) with which the integrator is already fluent, avoiding the learning curve of other build automation tools.
+
+If you want a point-and-click build server that lets you make jobs without knowing what a shell or cron scheduler is, this probably isn't for you. But if you want a build server that serves as a launch point, has a minimal but useful web interface, and otherwise *stays out of your way*, read on.
 
 ### Building and Installing
 
+* Install recent version of Go, v1.11 or newer recommended
+* Login as user account that will run bacill&mu;s
 ```
-[Login as user account that will run bacillus]
-[Install recent version of Go, v1.11 or newer recommended]
 $ git clone https://gogs.blitter.com/Russtopia/bacillus
 $ cd bacillus
 $ go install .
 ## .. finally, if you don't usually have $GOPATH/bin in your $PATH:
 $ cp ./bacillus $PREFIX/bin  # .. where $PREFIX = $HOME, /usr/local, ... your choice
 ## .. Try it out!
-$ ./bacillus_launch.sh # visit http://localhost:9990/
+$ ./bacillus_launch.sh
 ```
+* Visit http://localhost:9990/
 
 
 ## Configuration
 
-bacillus, being a simple tool, has little configuration. Almost all configuration is encapsulated in the tool's invocation command-line, and in the worker scripts themselves. Individual job configuration can be controlled by defining environment variables passed to each job within the invocation endpoint syntax.
+bacill&mu;s, being a simple tool, has little configuration. Almost all is encapsulated in the tool's invocation command-line, and in the worker scripts themselves. Individual job configuration can be controlled by defining environment variables passed to each job within the invocation endpoint syntax.
 
 ## Structure
 
 Sample installation tree
 
 ```
-/home/account/
-             /bacillus/                   (project tree)
-                      /bacillus           (main binary)
-                      /workdir/           (home of job scripts and running job workspaces)
-                      /artifacts/         (where jobs place their 'artifacts' during/after run)
-                      /images/            (image assets used by main binary)
-                      bacillus_launch.sh  (example launch script with a few demo job endpoints)
+/$HOME/
+      bacillus/                       (project tree)
+              bacillus                (main binary)
+              workdir/                (home of job scripts and running job workspaces)
+                     jobA.{sh,py,...} (job entry script for 'jobA')
+              artifacts/              (where jobs place their 'artifacts' during/after run)
+              images/                 (image assets used by main binary)
+              bacillus_launch.sh      (example launch script with a few demo job endpoints)
 ```
 
 ## Tracking of Jobs
 
-bacillus launches jobs as child processes, waiting on their exit and tagging their main stdout/stderr output, named 'console.out' within each worker's workspace (eg., *workdir/bacillus&lt;JOBID&gt;*). No external state or other meta-data is maintained, so there is no way to get out of sync with spawned jobs. If you kill the bacill&mu;s daemon, all currently-running jobs die too in standard UNIX fashion, unless jobs themselves detach via *nohup*.
+bacill&mu;s launches jobs as child processes, waiting on their exit and tagging their main stdout/stderr output, named 'console.out' within each worker's workspace (eg., *workdir/bacillus&lt;JOBID&gt;*). No external state or other meta-data is maintained, so there is no way to get out of sync with spawned jobs. If you kill the bacill&mu;s daemon, all currently-running jobs die too in standard UNIX fashion, unless jobs themselves detach via *nohup*.
 
 The repository contains sample scripts:
 
-* bacillus_launch.sh - launch bacillus with a few demo endpoints
+* bacillus_launch.sh - launch bacill&mu;s with a few demo endpoints
 * workdir/artifact.sh - simple example that just does 'work' for a short time and leaves artifacts
 * workdir/hkexsh_pushbuild.sh - a slightly more realistic build job for an external project
 * workdir/hkexsh_post-receive.sample - sample git post-receive hook used to trigger the above endpoint
 
-In summary, to perform build/CI tasks with bacillus, one should
+In summary, to perform build/CI tasks with bacill&mu;s, one should
 
 * add a git/web hook to external git repositories and/or git repo web servers
 * add job scripts to workdir/ to perform the intended tasks
 * define endpoints, jobOpts and jobEnv config for each to pass
-  to bacillus (see bacillus_launch.sh)
+  to bacill&mu;s (see bacillus_launch.sh)
 
 ## Storage
 
-The design of bacillus follows the Unix tool philosophy: 'do one thing and do it well'. As such, scheduling of repeated jobs and reaping of old job workspaces/artifacts to save disk space, archiving etc. are left to external tools (consider using cron, anacron, rsync, etc.). An example cron job to reap old workspaces and artifacts is described within the 'bacillus_launch.sh' script.
+The design of bacill&mu;s follows the Unix tool philosophy: *do one thing and do it well*. As such, scheduling of repeated jobs and reaping of old job workspaces/artifacts to save disk space, archiving etc. are left to external tools (consider using cron, anacron, rsync, etc.). An example cron job to reap old workspaces and artifacts is described within the 'bacillus_launch.sh' script.
 
 
 ## Larger Installations
@@ -76,7 +80,7 @@ To keep different categories of jobs logically separated and more manageable, co
 
 
 ## Example Run
-Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacillus itself)
+Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacill&mu;s itself)
 
 [terminal A - CI server]
 ```
