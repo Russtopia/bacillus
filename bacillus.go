@@ -29,10 +29,13 @@ const (
 )
 
 var (
-	addrPort     string
-	hookStd      string
-	apiKey       string
-	attachStdout bool
+	server             *http.Server
+	addrPort           string
+	hookStd            string
+	apiKey             string
+	attachStdout       bool
+	shutdownModeActive bool
+	killSwitch         chan bool
 	//statUseUnicode  bool
 	indStyle        string
 	instCounter     uint32
@@ -59,6 +62,9 @@ func getFavIcon() string {
 }
 
 func getBodyBgndHTMLFrag() string {
+	if shutdownModeActive {
+		return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus-shutdown.jpg"); background-size: cover;'`
+	}
 	return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus.jpg"); background-size: cover;'`
 }
 
@@ -342,6 +348,13 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					</head>
                     <body`+getBodyBgndHTMLFrag()+`>
 					`)
+			if shutdownModeActive {
+				io.WriteString(w, fmt.Sprintf("<pre>Server is in shutdown mode, come back later.</pre>\n"))
+				io.WriteString(w, `
+					</body>
+					</html>`)
+				return
+			}
 			io.WriteString(w, fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag))
 			io.WriteString(w, `
 					</body>
@@ -669,7 +682,13 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 
   .. that's about it.
      Happy Build Automating, DevOps-ing, or whatever it's called these days...
-  </pre>
+	 
+  Oh, and in case you need to...
+  <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
+  <a href='/cancelshutdown'>cancel a planned shutdown</a>
+  
+	 </pre>
+  
   <span style='font-size: 8px; position: fixed; bottom: 0; left: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 	`)
 	io.WriteString(w, `
@@ -678,7 +697,61 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	`)
 }
 
+func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	shutdownModeActive = false
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		getFavIcon()+
+		getGoBackHeaderJS("3000")+`
+					</head>
+                    <body`+getBodyBgndHTMLFrag()+`>
+					`)
+	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
+	io.WriteString(w, `
+					</body>
+					</html>`)
+}
+
+func shutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	shutdownModeActive = true
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		getFavIcon()+
+		getGoBackHeaderJS("3000")+`
+					</head>
+                    <body`+getBodyBgndHTMLFrag()+`>
+					`)
+	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
+	io.WriteString(w, `
+					</body>
+					</html>`)
+}
+
+func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		getFavIcon()+`
+					</head>
+                    <body`+getBodyBgndHTMLFrag()+`>
+					`)
+	io.WriteString(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
+	io.WriteString(w, `
+					</body>
+					</html>`)
+	killSwitch <- true
+}
+
 func main() {
+	killSwitch = make(chan bool, 1) // ensure a single send can proceed unblocked
 	var createRunlog bool
 
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
@@ -705,7 +778,7 @@ func main() {
 	}
 
 	log.SetOutput(logfile)
-	log.Printf("[bacillus %s startup] <a href='/usage'>usage</a>\n", appVer)
+	log.Printf("[bacillus %s startup]\n", appVer)
 	log.Printf("[listening on %s, type %s]\n", addrPort, hookStd)
 
 	cmdMap := make(map[string]string)
@@ -783,8 +856,18 @@ func main() {
 
 	// A single endpoint handles the 'live' job output
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
+
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
+
+	// Enter shutdown mode (stop launching new jobs)
+	http.HandleFunc("/shutdown", shutdownHandler)
+
+	// Enter shutdown mode (stop launching new jobs)
+	http.HandleFunc("/cancelshutdown", cancelShutdownHandler)
+
+	// Rude exit (regardless of running jobs)
+	http.HandleFunc("/rudeshutdown", rudeShutdownHandler)
 
 	// And finally, the root fallback to give help on defined endpoints.
 	http.HandleFunc("/", rootPageHandler)
@@ -793,5 +876,16 @@ func main() {
 	//	log.Fatal(http.ListenAndServe(":9991", http.FileServer(http.Dir(jobHomeDir))))
 	//}()
 
-	log.Fatal(http.ListenAndServe(addrPort, nil))
+	// Rather than use http.ListenAndServe() we break out that func
+	// and retain the http.Server var so we can call Shutdown() or
+	// Close() if needed.
+	server = &http.Server{Addr: addrPort, Handler: nil}
+	go func() {
+		log.Fatal(server.ListenAndServe())
+	}()
+
+	// .. and wait for a rude shutdown if requested
+	k := <-killSwitch
+	fmt.Printf("Got rudeShutdown:%v\n", k)
+	server.Shutdown(nil)
 }
