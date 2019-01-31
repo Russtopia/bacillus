@@ -60,11 +60,14 @@
 ## beyond 'blind', as github, gitlab, gogs.io etc. send JSON via POST)
 # $ curl -s -X POST -d [json] localhost:9990/gogs/<jobTag>
 
+PORT=9990
+RUNLOG_LIVE_VIEW_LINES=30
+
 ## If better log rotation is desired, use logrotate.
-#if [ -e run.log ]; then
-#  echo "Rolling previous log to run.log.bak"
-#  mv -f run.log run.log.bak
-#fi
+if [ -e run"${PORT}".log ] && [ ${1:-"n"} == "-r" ]; then
+  echo "Rolling previous log run${PORT}.log to run${PORT}.log.bak"
+  mv -f run"${PORT}".log run"${PORT}".log.bak
+fi
 
 ## Tagging jobs for periodic reaping
 ##
@@ -82,7 +85,7 @@
 ##   $HOME/bin/bacillus/artifacts/bacillus_kW* -maxdepth 0 -type d -mmin +10080)
 ##
 
-bacillus -a=:9990 -rl=30 \
+bacillus -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
  onPush_bacillus_build:kD::"../bacillus_pushbuild.sh" \
  onPush_hkexsh_build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
  onPush_bacillus_artifact:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh" \

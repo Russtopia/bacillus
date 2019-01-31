@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"sort"
 
 	"net/http"
 	"os"
@@ -31,14 +32,16 @@ const (
 var (
 	server             *http.Server
 	addrPort           string
-	hookStd            string
 	apiKey             string
 	attachStdout       bool
 	shutdownModeActive bool
 	killSwitch         chan bool
 	//statUseUnicode  bool
-	indStyle        string
-	instCounter     uint32
+	indStyle    string
+	instCounter uint32
+	//runningJobCount uint
+	cmdMap          map[string]string
+	runningJobTags  RunningJobList //map[string]string
 	jobHomeDir      string
 	artifactBaseDir string
 	runLogTailLines int
@@ -49,6 +52,8 @@ var (
 
 	jobCancellers map[string]func()
 )
+
+type RunningJobList map[string]string
 
 // There is a smattering of HTML and JS in this project, programmatically
 // generated.
@@ -79,9 +84,9 @@ func getGoBackHeaderJS(ms string) string {
 `, ms)
 }
 
-func getRefreshJS(stat rune) string {
+func getRefreshJS(stat rune, intervalSecs string) string {
 	if stat == 'r' {
-		return `<meta http-equiv="refresh" content="5">`
+		return `<meta http-equiv="refresh" content="` + intervalSecs + `">`
 	} else {
 		return ``
 	}
@@ -290,7 +295,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 <head>
 `+
 		getFavIcon()+
-		getRefreshJS(stat)+
+		getRefreshJS(stat, "5")+
 		getStyleCSS()+
 		getCompatJS()+
 		getSpinnerJS(stat, codeColor, statWord)+
@@ -338,7 +343,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 		"gold",
 		"goldenrod"}
 
-	http.HandleFunc(fmt.Sprintf("/%s/%s", hookStd, jobTag),
+	http.HandleFunc(fmt.Sprintf("/%s", jobTag),
 		func(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, `
 					<html>
@@ -455,6 +460,8 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 						log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
 							jobTag)
 					} else {
+						//runningJobCount += 1
+						runningJobTags[jobID] = jobTag
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
 						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
@@ -487,6 +494,9 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 							})
 					}
 					werr := c.Wait()
+					//runningJobCount -= 1
+					delete(runningJobTags, jobID)
+
 					//jobCancellers[jobID]()
 					delete(jobCancellers, jobID)
 
@@ -635,9 +645,9 @@ func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
 	// (only 'live' view)
 	tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
 
-	io.WriteString(w, "<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s "+appVer+"</a></pre>\n")
+	io.WriteString(w, getShortLogoHeaderHTMLFrag())
 	io.WriteString(w, "<pre style='background-color: skyblue;'>")
-	io.WriteString(w, lines[0]+"<a href='/fullrunlog'>...</a>")
+	io.WriteString(w, "<a href='/fullrunlog'>... click for full runlog ...</a>")
 	io.WriteString(w, "</pre>")
 
 	io.WriteString(w, "<pre>")
@@ -655,22 +665,33 @@ func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
     `)
 }
 
+func getShortLogoHeaderHTMLFrag() string {
+	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
+}
+
+func getLongLogoHeaderHTMLFrag() string {
+	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
+}
+
 func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
 <html>
 <head>`+
-		getFavIcon()+`
+		getFavIcon()+
+		getRefreshJS('r', "10")+`
 </head>
   <body `+getBodyBgndHTMLFrag()+`>
 		`)
+	io.WriteString(w, getLongLogoHeaderHTMLFrag())
 	io.WriteString(w, `
   <pre>
-  bacill&mu;s `+appVer+` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a>
   
   <a href='/runlog'>/runlog</a>: main log/activity view
   <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
-
+  
+  <span>Running jobs:`+fmt.Sprintf("%d", len(runningJobTags))+`</span>
+  
   LEGEND
   [&rtrif;] Start a job manually
   [&cross;] Cancel a running job
@@ -687,7 +708,9 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
   
-	 </pre>
+  
+Jobs Served`+getManualJobTriggersHTMLFrag()+`
+  </pre>
   
   <span style='font-size: 8px; position: fixed; bottom: 0; left: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 	`)
@@ -695,6 +718,24 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 </body>
 </html>
 	`)
+}
+
+func getManualJobTriggersHTMLFrag() (ret string) {
+	ret = "<pre style='background-color: skyblue;'>"
+	keys := make([]string, len(cmdMap))
+	for k := range cmdMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		if len(cmdMap[k]) > 0 {
+			ret += fmt.Sprintf("<a href='%s' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
+				k, k, cmdMap[k])
+		}
+	}
+	ret += "</pre>"
+	return
 }
 
 func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
@@ -756,7 +797,6 @@ func main() {
 
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.BoolVar(&createRunlog, "c", false, "set true/1 to create new run.log, overwriting old one")
-	flag.StringVar(&hookStd, "h", "blind", "hook type")
 	flag.StringVar(&apiKey, "k", defKey, "API key")
 	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
@@ -765,6 +805,9 @@ func main() {
 	flag.Parse()
 
 	mainCtx := context.Background()
+
+	cmdMap = make(map[string]string)
+	runningJobTags = make(map[string]string)
 	jobCancellers = make(map[string]func())
 
 	var logfile *os.File
@@ -779,9 +822,7 @@ func main() {
 
 	log.SetOutput(logfile)
 	log.Printf("[bacillus %s startup]\n", appVer)
-	log.Printf("[listening on %s, type %s]\n", addrPort, hookStd)
-
-	cmdMap := make(map[string]string)
+	log.Printf("[listening on %s]\n", addrPort)
 
 	//log.Printf("Registering handler for /runlog page.\n")
 	http.HandleFunc("/runlog", runLogPageHandler)
@@ -816,17 +857,10 @@ func main() {
 			cmdMap[tag] = cmd
 
 			// Launch webhook listeners for each defined endpoint
-			// Note presently only 'blind' hookStd is supported
+			// Note presently only 'blind' hooks are supported
 			// (ie., if webhook request contains POST JSON data,
 			// it isn't read).
-			if len(tag) > 0 {
-				//log.Printf("<a href='%s/%s'>[&#9654;]</a>%s/%s [action %s]\n",
-				log.Printf("<a href='%s/%s' title='Play Job'>[&rtrif;]</a>%s/%s [action %s]\n",
-					hookStd, tag,
-					hookStd, tag, cmd)
-
-				launchJobListener(mainCtx, tag, jobOpts, jobEnv, cmdMap)
-			}
+			launchJobListener(mainCtx, tag, jobOpts, jobEnv, cmdMap)
 		}
 	}
 
