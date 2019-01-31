@@ -45,6 +45,9 @@ type FileServer struct {
 // 'Trailing Slash Redirection'
 //
 func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !httpAuthSession(w, r) {
+		return
+	}
 	rootpath, _ := filepath.Abs(strings.TrimPrefix(fs.Root, "/"))
 	upath := r.URL.EscapedPath()
 	//upath := path.Clean(r.URL.Path)

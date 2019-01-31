@@ -25,13 +25,18 @@ import (
 )
 
 const (
-	appVer string = "v0.1"
-	defKey string = "IAmABanana" //TODO: rudimentary API guarding
+	appVer         string = "v0.1"
+	httpAuthUser          = "bacuser"
+	httpAuthPasswd        = "gramnegative" //b64:"YmFjdXNlcjpncmFtbmVnYXRpdmU="
 )
 
 var (
 	server             *http.Server
 	addrPort           string
+	basicAuth          bool   // basic http auth
+	strUser            string // API user
+	strPasswd          string // API passwd
+	authState          int
 	apiKey             string
 	attachStdout       bool
 	shutdownModeActive bool
@@ -41,7 +46,7 @@ var (
 	instCounter uint32
 	//runningJobCount uint
 	cmdMap          map[string]string
-	runningJobTags  RunningJobList //map[string]string
+	runningJobs     RunningJobList //map[string]string
 	jobHomeDir      string
 	artifactBaseDir string
 	runLogTailLines int
@@ -61,6 +66,34 @@ type RunningJobList map[string]string
 // Yes, I may rewrite in the future to do so, but don't hold your breath.
 // I didn't design this thing up-front, I wrote it to scratch an itch.
 // That's what 'agile design' gets you :p
+
+func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
+	w.Header().Set("Cache-Control", "no-cache")
+
+	if !basicAuth {
+		return true
+	}
+
+	if authState == 0 {
+		authState = 1
+		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Auth Required")
+		return
+	}
+
+	if authState > 0 {
+		u, p, ok := r.BasicAuth()
+		if ok && u == strUser && p == strPasswd {
+			authState = 2
+			auth = true
+		} else {
+			authState = 0
+			io.WriteString(w, "Incorrect.")
+		}
+	}
+	return
+}
 
 func getFavIcon() string {
 	return `<link rel="icon" type="image/jpg" href="/images/logo.jpg"/>`
@@ -221,28 +254,41 @@ func getCompatJS() string {
 // job invocation in a GET or POST request.
 
 func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
 	runLog, e := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 	if e != nil {
 		w.Write([]byte(fmt.Sprintf("%s", e)))
 		return
 	}
-	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, "<html><head>"+getFavIcon()+"</head><body><pre>\n")
 	w.Write(runLog)
 	io.WriteString(w, "</pre></body</html>\n")
 }
 
 func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/plain")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
 	consoleLog, e := ioutil.ReadFile(strings.Replace(fmt.Sprintf("%s", r.URL)[1:], "/fullconsole", "", 1))
 	if e != nil {
 		w.Write([]byte(fmt.Sprintf("%s", e)))
 		return
 	}
-	w.Header().Set("Content-type", "text/plain")
 	w.Write(consoleLog)
 }
 
 func consoleHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
 	//if true {
 
 	// Read file from URL, removing leading / as workdir is rel to us
@@ -289,7 +335,6 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		statWord = "Done"
 	}
 
-	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
 <html>
 <head>
@@ -345,6 +390,10 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 
 	http.HandleFunc(fmt.Sprintf("/%s", jobTag),
 		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-type", "text/html")
+			if !httpAuthSession(w, r) {
+				return
+			}
 			io.WriteString(w, `
 					<html>
 					<head>`+
@@ -461,7 +510,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 							jobTag)
 					} else {
 						//runningJobCount += 1
-						runningJobTags[jobID] = jobTag
+						runningJobs[jobID] = jobTag
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
 						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
@@ -474,6 +523,10 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 						// Spawn handler for /cancel/<jobID>
 						http.HandleFunc(fmt.Sprintf("/cancel/%s", jobID),
 							func(w http.ResponseWriter, r *http.Request) {
+								w.Header().Set("Content-type", "text/html")
+								if !httpAuthSession(w, r) {
+									return
+								}
 								io.WriteString(w, `
 					<html>
 					<head>`+
@@ -495,7 +548,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					}
 					werr := c.Wait()
 					//runningJobCount -= 1
-					delete(runningJobTags, jobID)
+					delete(runningJobs, jobID)
 
 					//jobCancellers[jobID]()
 					delete(jobCancellers, jobID)
@@ -621,6 +674,10 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 
 func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
 	io.WriteString(w, `
 <html>
 <head>
@@ -672,9 +729,12 @@ func getShortLogoHeaderHTMLFrag() string {
 func getLongLogoHeaderHTMLFrag() string {
 	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
 }
-
 func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
 	io.WriteString(w, `
 <html>
 <head>`+
@@ -690,7 +750,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   <a href='/runlog'>/runlog</a>: main log/activity view
   <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
   
-  <span>Running jobs:`+fmt.Sprintf("%d", len(runningJobTags))+`</span>
+  <span>Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`</span>
   
   LEGEND
   [&rtrif;] Start a job manually
@@ -712,7 +772,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 Jobs Served`+getManualJobTriggersHTMLFrag()+`
   </pre>
   
-  <span style='font-size: 8px; position: fixed; bottom: 0; left: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
+  <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 	`)
 	io.WriteString(w, `
 </body>
@@ -793,21 +853,23 @@ func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	killSwitch = make(chan bool, 1) // ensure a single send can proceed unblocked
+
 	var createRunlog bool
 
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
+	flag.BoolVar(&basicAuth, "auth", true, "enable basic http auth login (be sure to also set -u and -p)")
+	flag.StringVar(&strUser, "u", httpAuthUser, "web UI and endpoint username")
+	flag.StringVar(&strPasswd, "p", httpAuthPasswd, "web UI and endpoint password")
 	flag.BoolVar(&createRunlog, "c", false, "set true/1 to create new run.log, overwriting old one")
-	flag.StringVar(&apiKey, "k", defKey, "API key")
 	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
-	//flag.BoolVar(&statUseUnicode, "S", true, "set to false to use plain ASCII (ISO-8859-1) in /runlog")
 	flag.Parse()
 
 	mainCtx := context.Background()
 
 	cmdMap = make(map[string]string)
-	runningJobTags = make(map[string]string)
+	runningJobs = make(map[string]string)
 	jobCancellers = make(map[string]func())
 
 	var logfile *os.File

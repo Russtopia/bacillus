@@ -60,8 +60,11 @@
 ## beyond 'blind', as github, gitlab, gogs.io etc. send JSON via POST)
 # $ curl -s -X POST -d [json] localhost:9990/gogs/<jobTag>
 
-PORT=9990
-RUNLOG_LIVE_VIEW_LINES=30
+PORT=${PORT:-9990}
+AUTH=${AUTH:-false}
+AUTH_USER=${AUTH_USER:-"foo"}
+AUTH_PASS=${AUTH_PASS:-"bar"}
+RUNLOG_LIVE_VIEW_LINES=${RUNLOG_LIVE_VIEW_LINES:-30}
 
 ## If better log rotation is desired, use logrotate.
 if [ -e run"${PORT}".log ] && [ ${1:-"n"} == "-r" ]; then
@@ -86,6 +89,7 @@ fi
 ##
 
 bacillus -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
+ -auth=${AUTH} -u=${AUTH_USER} -p=${AUTH_PASS} \
  onPush_bacillus_build:kD::"../bacillus_pushbuild.sh" \
  onPush_hkexsh_build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
  onPush_bacillus_artifact:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh" \
