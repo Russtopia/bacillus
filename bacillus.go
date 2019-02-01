@@ -828,14 +828,14 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 
 	authState = 0
-	w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
-	w.WriteHeader(http.StatusUnauthorized)
+	//w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+	//w.WriteHeader(http.StatusUnauthorized)
 	io.WriteString(w, `<html>
   <head>
   <!-- <meta http-equiv="refresh" content="2;url=/" /> -->
   </head>
   <body>
-    Logged out.
+    Logged out. <a href="/">return</a>
   </body>
   </html>`)
 	return
