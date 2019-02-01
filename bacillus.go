@@ -68,6 +68,7 @@ type RunningJobList map[string]string
 // That's what 'agile design' gets you :p
 
 func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
+	fmt.Println("authState:", authState)
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if !basicAuth {
@@ -89,6 +90,8 @@ func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 			auth = true
 		} else {
 			authState = 0
+			w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+			w.WriteHeader(http.StatusUnauthorized)
 			io.WriteString(w, "Incorrect.")
 		}
 	}
@@ -767,6 +770,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   Oh, and in case you need to...
   <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
+  <a href='/logout'>logout</a>
   
   
 Jobs Served`+getManualJobTriggersHTMLFrag()+`
@@ -814,6 +818,27 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 					</body>
 					</html>`)
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+
+	authState = 0
+	w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+	w.WriteHeader(http.StatusUnauthorized)
+	io.WriteString(w, `<html>
+  <head>
+  <!-- <meta http-equiv="refresh" content="2;url=/" /> -->
+  </head>
+  <body>
+    Logged out.
+  </body>
+  </html>`)
+	return
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
@@ -964,6 +989,11 @@ func main() {
 
 	// Rude exit (regardless of running jobs)
 	http.HandleFunc("/rudeshutdown", rudeShutdownHandler)
+
+	// Logout
+	if basicAuth {
+		http.HandleFunc("/logout", logoutHandler)
+	}
 
 	// And finally, the root fallback to give help on defined endpoints.
 	http.HandleFunc("/", rootPageHandler)
