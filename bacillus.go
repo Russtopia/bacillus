@@ -495,10 +495,10 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 				instColour := instColours[instColourIdx]
 
 				dirTmp, _ := filepath.Abs(jobHomeDir)
-				workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_", jobOpts))
+				workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_%s_", jobOpts, jobTag))
 				c.Dir = workDir
-				jobID := strings.Split(workDir, "_")[2]
-
+				jobID := strings.Split(workDir, "_")[3]
+				fmt.Println("jobID:", jobID)
 				var indent int64
 				var indentStr string
 				if indStyle == "indent" || indStyle == "both" {
@@ -513,7 +513,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					var workerOutputFile *os.File
 					consoleFName := "console.out"
 					workerOutputPath = workDir + "/" + consoleFName
-					workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s/%s", jobHomeDir, jobOpts, jobID, consoleFName)
+					workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s_%s/%s", jobHomeDir, jobOpts, jobTag, jobID, consoleFName)
 					if attachStdout {
 						c.Stdout = os.Stdout
 						c.Stderr = os.Stderr
@@ -528,7 +528,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBID=%s", jobID))
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBTAG=%s", jobTag))
 					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_WORKDIR=%s", workDir))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s", workDir, jobOpts, jobID)))
+					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s_%s", workDir, jobOpts, jobTag, jobID)))
 					c.Env = append(c.Env, jobEnv...)
 
 					// JOB STATUS METADATA PREPENDED TO console.out
@@ -573,7 +573,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 							jobID)
 
 						// Spawn handler for /cancel/<jobID>
-						http.HandleFunc(fmt.Sprintf("/cancel/%s", jobID),
+						http.HandleFunc(fmt.Sprintf("/cancel/%s_%s", jobTag, jobID),
 							func(w http.ResponseWriter, r *http.Request) {
 								w.Header().Set("Content-type", "text/html")
 								if !httpAuthSession(w, r) {
@@ -589,9 +589,9 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					`)
 								if jobCancellers[jobID] != nil {
 									jobCancellers[jobID]()
-									io.WriteString(w, fmt.Sprintf("<pre>Cancelled %s</pre>\n", jobID))
+									io.WriteString(w, fmt.Sprintf("<pre>Cancelled %s_%s</pre>\n", jobTag, jobID))
 								} else {
-									io.WriteString(w, fmt.Sprintf("<pre>Job %s already done or not found.</pre>\n", jobID))
+									io.WriteString(w, fmt.Sprintf("<pre>Job %s_%s already done or not found.</pre>\n", jobTag, jobID))
 								}
 								io.WriteString(w, `
 					</body>
@@ -631,19 +631,19 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					}
 
 					if werr == nil {
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
 							jobID, instColour,
 							workerOutputRelPath,
 							indentStr,
 							jobTag, jobID,
-							jobOpts, jobID)
+							jobOpts, jobTag, jobID)
 					} else {
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
 							jobID, instColour,
 							workerOutputRelPath,
 							indentStr,
 							jobTag, jobID,
-							jobOpts, jobID,
+							jobOpts, jobTag, jobID,
 							werr)
 					}
 				}
@@ -925,7 +925,7 @@ func main() {
 		var jobEnv []string
 		var cmd string
 		if fields[0] != e {
-			tag = fields[0]
+			tag = strings.Replace(fields[0], "_", "-", -1)
 			if len(fields) > 1 && len(fields) != 4 {
 				errStr := fmt.Sprintf("\n  [%s]\n"+
 					"  All endpoint specs must have exactly 4 fields:\n"+
