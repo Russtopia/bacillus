@@ -769,7 +769,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
   
 Latest Job Activity (Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`)
-
+...
 `+getLiveRunLogHTMLFrag(5)+`
   LEGEND
   [&rtrif;] Start a job manually
@@ -788,7 +788,7 @@ Latest Job Activity (Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`)
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
   <a href='`+logoutURI+`'>logout</a>
   
-Jobs Served`+getManualJobTriggersHTMLFrag(false)+`
+Jobs Served (click Play to manually trigger)`+getManualJobTriggersHTMLFrag(false)+`
   <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 	`)
 	io.WriteString(w, `
