@@ -214,6 +214,12 @@ func getStyleCSS() string {
   `
 }
 
+// TODO: types for matching JSON events of
+// supported webhooks: gogs.io, github, gitlab, ... ?
+// For now, the 'blind' endpoint is the only one supported,
+// meaning the request can't communicate any extra data to the
+// job invocation in a GET or POST request.
+
 func getCompatJS() string {
 	return `
     <script>
@@ -236,11 +242,57 @@ func getCompatJS() string {
 	`
 }
 
-// TODO: types for matching JSON events of
-// supported webhooks: gogs.io, github, gitlab, ... ?
-// For now, the 'blind' endpoint is the only one supported,
-// meaning the request can't communicate any extra data to the
-// job invocation in a GET or POST request.
+func getLiveRunLogHTMLFrag(tl int) (ret string) {
+	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
+
+	// Split log into header and the rest, with endpoints
+	// at top and events below, so as log gets longer user
+	// can still see important bits.
+	lines := strings.Split(string(rl), "--BACILLUS READY--")
+	tailLines := strings.Split(lines[1], "\n")
+	tailCount := len(tailLines)
+
+	// Scan backwards in log for completion msgs, match with
+	// preceding launch msgs to un-mark the in-progress and cancel icons there
+	// (only 'live' view)
+	tailLines = patchCompletedJobsInLog(tailLines, tl)
+
+	//ret += "<pre>\n"
+	if tl == 0 || tailCount < tl {
+		ret += strings.Join(tailLines, "\n")
+	} else {
+		ret += strings.Join(tailLines[tailCount-tl:], "\n")
+	}
+	//ret += "</pre>\n"
+
+	return
+}
+
+func runLogHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
+	io.WriteString(w, `
+<html>
+<head>
+<meta http-equiv="refresh" content="5">`+
+		getFavIcon()+
+		getRunLogCSS()+
+		getShortLogoHeaderHTMLFrag()+`
+</head>
+<body `+getBodyBgndHTMLFrag()+`>
+	`)
+
+	io.WriteString(w, getManualJobTriggersHTMLFrag()+
+		`<pre>`+getLiveRunLogHTMLFrag(runLogTailLines)+`</pre>`)
+
+	io.WriteString(w, `
+</body>
+</html>
+    `)
+}
 
 func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/html")
@@ -253,9 +305,20 @@ func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf("%s", e)))
 		return
 	}
-	io.WriteString(w, "<html><head>"+getFavIcon()+"</head><body><pre>\n")
-	w.Write(runLog)
-	io.WriteString(w, "</pre></body</html>\n")
+	io.WriteString(w, `
+<html>
+<head>`+
+		getFavIcon()+
+		getShortLogoHeaderHTMLFrag()+`
+</head>
+<body>`)
+
+	io.WriteString(w, `
+<pre>
+`+string(runLog)+`
+</pre>
+</body>
+</html>`)
 }
 
 func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
@@ -661,56 +724,6 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 //	return
 //}
 
-func runLogPageHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/html")
-	if !httpAuthSession(w, r) {
-		return
-	}
-
-	io.WriteString(w, `
-<html>
-<head>
-<meta http-equiv="refresh" content="5">`+
-		getFavIcon()+
-		getRunLogCSS()+`
-</head>
-<body `+getBodyBgndHTMLFrag()+`>
-	`)
-
-	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
-
-	// Split log into header and the rest, with endpoints
-	// at top and events below, so as log gets longer user
-	// can still see important bits.
-	lines := strings.Split(string(rl), "--BACILLUS READY--")
-	tailLines := strings.Split(lines[1], "\n")
-	tailCount := len(tailLines)
-
-	// Scan backwards in log for completion msgs, match with
-	// preceding launch msgs to un-mark the in-progress and cancel icons there
-	// (only 'live' view)
-	tailLines = patchCompletedJobsInLog(tailLines, runLogTailLines)
-
-	io.WriteString(w, getShortLogoHeaderHTMLFrag())
-	io.WriteString(w, "<pre style='background-color: skyblue;'>")
-	io.WriteString(w, "<a href='/fullrunlog'>... click for full runlog ...</a>")
-	io.WriteString(w, "</pre>")
-
-	io.WriteString(w, "<pre>")
-	if runLogTailLines == 0 || tailCount < runLogTailLines {
-		io.WriteString(w, strings.Join(tailLines, "\n"))
-	} else {
-		io.WriteString(w, strings.Join(tailLines[tailCount-runLogTailLines:], "\n"))
-	}
-	io.WriteString(w, "</pre>")
-	//
-
-	io.WriteString(w, `
-</body>
-</html>
-    `)
-}
-
 func getShortLogoHeaderHTMLFrag() string {
 	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
 }
@@ -752,20 +765,20 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, getLongLogoHeaderHTMLFrag())
 	io.WriteString(w, `
   <pre>
+<a href='/runlog'>/runlog</a>: main log/activity view
+<a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
   
-  <a href='/runlog'>/runlog</a>: main log/activity view
-  <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
-  
-  <span>Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`</span>
-  
+Latest Job Activity (Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`)
+
+`+getLiveRunLogHTMLFrag(5)+`
   LEGEND
   [&rtrif;] Start a job manually
   [&cross;] Cancel a running job
   [&ccupssm;] View completed job artifacts
   [&ccups;] View partial artifacts for a failed job
-  [&acd;] Job is running - click to view in-progress output
-  [&check;] Job has completed with OK(0) status - click to view output
-  <span style='background-color:red'>[!]</span> Job has exited with nonzero status - click to view output
+  [&acd;] Job is running - click to view
+  [&check;] Job completed with OK(0) status - click to view
+  <span style='background-color:red'>[!]</span> Job completed with nonzero status - click to view
 
   .. that's about it.
      Happy Build Automating, DevOps-ing, or whatever it's called these days...
@@ -773,12 +786,9 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   Oh, and in case you need to...
   <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
-  <a href='/?logout'>logout</a>
-  
+  <a href='`+logoutURI+`'>logout</a>
   
 Jobs Served`+getManualJobTriggersHTMLFrag()+`
-  </pre>
-  
   <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 	`)
 	io.WriteString(w, `
@@ -786,6 +796,11 @@ Jobs Served`+getManualJobTriggersHTMLFrag()+`
 </html>
 	`)
 }
+
+// This hack is from https://stackoverflow.com/a/14329930/1012159
+var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.execCommand("ClearAuthenticationCache")}catch(d){}a||((a=window.XMLHttpRequest?new window.XMLHttpRequest:window.ActiveXObject?new ActiveXObject("Microsoft.XMLHTTP"):void 0)?(a.open("HEAD",c||location.href,!0,"logout",(new Date).getTime().toString()),a.send(""),a=1):a=void 0);a||(b="Your browser is too old or too weird to support log out functionality. Close all windows and restart the browser.");alert(b)})(/*pass safeLocation here if you need*/);`
+
+//var logoutURI = `/?logout`
 
 func getManualJobTriggersHTMLFrag() (ret string) {
 	ret = "<pre style='background-color: skyblue;'>"
@@ -801,6 +816,7 @@ func getManualJobTriggersHTMLFrag() (ret string) {
 				k, k, cmdMap[k])
 		}
 	}
+	ret += "<a href='/fullrunlog'>... click for full runlog ...</a>"
 	ret += "</pre>"
 	return
 }
@@ -894,7 +910,7 @@ func main() {
 	log.Printf("[listening on %s]\n", addrPort)
 
 	//log.Printf("Registering handler for /runlog page.\n")
-	http.HandleFunc("/runlog", runLogPageHandler)
+	http.HandleFunc("/runlog", runLogHandler)
 	jobHomeDir = "workdir"
 	// Each non-switch argument is taken to be an endpoint (job) descriptor
 	// Syntax of an endpoint:
