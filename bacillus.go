@@ -36,7 +36,6 @@ var (
 	basicAuth          bool   // basic http auth
 	strUser            string // API user
 	strPasswd          string // API passwd
-	authState          int
 	apiKey             string
 	attachStdout       bool
 	shutdownModeActive bool
@@ -68,32 +67,19 @@ type RunningJobList map[string]string
 // That's what 'agile design' gets you :p
 
 func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
-	fmt.Println("authState:", authState)
 	w.Header().Set("Cache-Control", "no-cache")
 
 	if !basicAuth {
 		return true
 	}
 
-	if authState == 0 {
-		authState = 1
+	u, p, ok := r.BasicAuth()
+	if ok && u == strUser && p == strPasswd {
+		return true
+	} else {
 		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Auth Required")
-		return
-	}
-
-	if authState > 0 {
-		u, p, ok := r.BasicAuth()
-		if ok && u == strUser && p == strPasswd {
-			authState = 2
-			auth = true
-		} else {
-			authState = 0
-			w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "Incorrect.")
-		}
+		io.WriteString(w, "Incorrect.")
 	}
 	return
 }
@@ -732,7 +718,24 @@ func getShortLogoHeaderHTMLFrag() string {
 func getLongLogoHeaderHTMLFrag() string {
 	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
 }
+
+//func logoutPageHandler(w http.ResponseWriter, r *http.Request) {
+//	io.WriteString(w, "<a href='/?logout'>Click to logout</a>")
+//	return
+//}
+
 func rootPageHandler(w http.ResponseWriter, r *http.Request) {
+	// See if there are actions (currently just logout)
+	_, ok := r.URL.Query()["logout"]
+	if ok {
+		w.Header().Set("Content-type", "text/html")
+		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		//io.WriteString(w, `<head><meta http-equiv="refresh" content="0;URL='/'" /></head>`)
+		io.WriteString(w, `<pre><a href='/'>You must log in.</a></pre>`)
+		return
+	}
+
 	w.Header().Set("Content-type", "text/html")
 	if !httpAuthSession(w, r) {
 		return
@@ -770,7 +773,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   Oh, and in case you need to...
   <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
-  <a href='/logout'>logout</a>
+  <a href='/?logout'>logout</a>
   
   
 Jobs Served`+getManualJobTriggersHTMLFrag()+`
@@ -818,27 +821,6 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 					</body>
 					</html>`)
-}
-
-func logoutHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/html")
-	if !httpAuthSession(w, r) {
-		return
-	}
-	w.Header().Set("Cache-Control", "no-cache")
-
-	authState = 0
-	//w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
-	//w.WriteHeader(http.StatusUnauthorized)
-	io.WriteString(w, `<html>
-  <head>
-  <!-- <meta http-equiv="refresh" content="2;url=/" /> -->
-  </head>
-  <body>
-    Logged out. <a href="/">return</a>
-  </body>
-  </html>`)
-	return
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
@@ -990,10 +972,8 @@ func main() {
 	// Rude exit (regardless of running jobs)
 	http.HandleFunc("/rudeshutdown", rudeShutdownHandler)
 
-	// Logout
-	if basicAuth {
-		http.HandleFunc("/logout", logoutHandler)
-	}
+	//// Logout sequence page
+	//http.HandleFunc("/logout", logoutPageHandler)
 
 	// And finally, the root fallback to give help on defined endpoints.
 	http.HandleFunc("/", rootPageHandler)
