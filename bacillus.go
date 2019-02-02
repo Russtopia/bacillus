@@ -79,7 +79,7 @@ func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 	} else {
 		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Incorrect.")
+		io.WriteString(w, "Not logged in.")
 	}
 	return
 }
@@ -285,7 +285,7 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 <body `+getBodyBgndHTMLFrag()+`>
 	`)
 
-	io.WriteString(w, getManualJobTriggersHTMLFrag()+
+	io.WriteString(w, getManualJobTriggersHTMLFrag(true)+
 		`<pre>`+getLiveRunLogHTMLFrag(runLogTailLines)+`</pre>`)
 
 	io.WriteString(w, `
@@ -788,7 +788,7 @@ Latest Job Activity (Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`)
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
   <a href='`+logoutURI+`'>logout</a>
   
-Jobs Served`+getManualJobTriggersHTMLFrag()+`
+Jobs Served`+getManualJobTriggersHTMLFrag(false)+`
   <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
 	`)
 	io.WriteString(w, `
@@ -802,7 +802,7 @@ var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.ex
 
 //var logoutURI = `/?logout`
 
-func getManualJobTriggersHTMLFrag() (ret string) {
+func getManualJobTriggersHTMLFrag(fullLogLink bool) (ret string) {
 	ret = "<pre style='background-color: skyblue;'>"
 	keys := make([]string, len(cmdMap))
 	for k := range cmdMap {
@@ -816,7 +816,9 @@ func getManualJobTriggersHTMLFrag() (ret string) {
 				k, k, cmdMap[k])
 		}
 	}
-	ret += "<a href='/fullrunlog'>... click for full runlog ...</a>"
+	if fullLogLink {
+		ret += "<a href='/fullrunlog'>... click for full runlog ...</a>"
+	}
 	ret += "</pre>"
 	return
 }
