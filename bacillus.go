@@ -66,6 +66,39 @@ type RunningJobList map[string]string
 // I didn't design this thing up-front, I wrote it to scratch an itch.
 // That's what 'agile design' gets you :p
 
+func XHRCSSFrag() string {
+	return `<style>
+		span.xhrlink:hover {
+				text-decoration: underline;
+				background-color: aliceblue;
+				cursor: pointer;
+		}
+		span.xhrlink:active {
+				background-color: lightgreen;
+		}
+		</style>
+		`
+}
+
+// Emit JS function suitable for calling from an html element
+// Typically used for an onclick event to fire off an async GET req.
+func pokeUriJSFrag(jsFuncName string, uri string) string {
+	return `
+<script>
+	function ` + jsFuncName + `() {
+		// IDGAF about IE 5/6, nor should you
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if( this.readyState == 4 && this.status == 200 ) {
+				// whatevs, maybe give feedback to user
+			}
+		};
+		xhttp.open('GET', '` + uri + `', true);
+		xhttp.send();
+	}
+</script>`
+}
+
 func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 	w.Header().Set("Cache-Control", "no-cache")
 
@@ -277,9 +310,10 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 <html>
 <head>
-<meta http-equiv="refresh" content="5">`+
+<meta http-equiv="refresh" content="10">`+
 		getFavIcon()+
 		getRunLogCSS()+
+		XHRCSSFrag()+
 		getShortLogoHeaderHTMLFrag()+`
 </head>
 <body `+getBodyBgndHTMLFrag()+`>
@@ -288,6 +322,7 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, getManualJobTriggersHTMLFrag(true)+
 		`<pre>`+getLiveRunLogHTMLFrag(runLogTailLines)+`</pre>`)
 
+	io.WriteString(w, getManualJobTriggersJSFrag())
 	io.WriteString(w, `
 </body>
 </html>
@@ -498,7 +533,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 				workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_%s_", jobOpts, jobTag))
 				c.Dir = workDir
 				jobID := strings.Split(workDir, "_")[3]
-				fmt.Println("jobID:", jobID)
+				//fmt.Println("jobID:", jobID)
 				var indent int64
 				var indentStr string
 				if indStyle == "indent" || indStyle == "both" {
@@ -565,15 +600,15 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 						runningJobs[jobID] = jobTag
 						jobCancellers[jobID] = cmdCancelFunc
 						w.Write([]byte("OK"))
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
+						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/%s_%s_%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
 							jobID, instColour,
 							workerOutputRelPath,
 							indentStr,
 							jobTag, jobID,
-							jobID)
+							jobOpts, jobTag, jobID)
 
 						// Spawn handler for /cancel/<jobID>
-						http.HandleFunc(fmt.Sprintf("/cancel/%s_%s", jobTag, jobID),
+						http.HandleFunc(fmt.Sprintf("/cancel/%s_%s_%s", jobOpts, jobTag, jobID),
 							func(w http.ResponseWriter, r *http.Request) {
 								w.Header().Set("Content-type", "text/html")
 								if !httpAuthSession(w, r) {
@@ -589,9 +624,9 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					`)
 								if jobCancellers[jobID] != nil {
 									jobCancellers[jobID]()
-									io.WriteString(w, fmt.Sprintf("<pre>Cancelled %s_%s</pre>\n", jobTag, jobID))
+									io.WriteString(w, fmt.Sprintf("<pre>Cancelled %s_%s_%s</pre>\n", jobOpts, jobTag, jobID))
 								} else {
-									io.WriteString(w, fmt.Sprintf("<pre>Job %s_%s already done or not found.</pre>\n", jobTag, jobID))
+									io.WriteString(w, fmt.Sprintf("<pre>Job %s_%s_%s already done or not found.</pre>\n", jobOpts, jobTag, jobID))
 								}
 								io.WriteString(w, `
 					</body>
@@ -758,7 +793,8 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <html>
 <head>`+
 		getFavIcon()+
-		getRefreshJS('r', "10")+`
+		getRefreshJS('r', "5")+
+		XHRCSSFrag()+`
 </head>
   <body `+getBodyBgndHTMLFrag()+`>
 		`)
@@ -790,7 +826,9 @@ Latest Job Activity (Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`)
   
 Jobs Served (click Play to manually trigger)`+getManualJobTriggersHTMLFrag(false)+`
   <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
-	`)
+  </pre>`)
+
+	io.WriteString(w, getManualJobTriggersJSFrag())
 	io.WriteString(w, `
 </body>
 </html>
@@ -802,6 +840,23 @@ var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.ex
 
 //var logoutURI = `/?logout`
 
+func getManualJobTriggersJSFrag() (ret string) {
+	// Put in the click JS functions first
+	keys := make([]string, len(cmdMap))
+	for k := range cmdMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		if len(cmdMap[k]) > 0 {
+			fn := strings.Replace(k, "-", "", -1)
+			ret += pokeUriJSFrag(fn, k)
+		}
+	}
+	return
+}
+
 func getManualJobTriggersHTMLFrag(fullLogLink bool) (ret string) {
 	ret = "<pre style='background-color: skyblue;'>"
 	keys := make([]string, len(cmdMap))
@@ -812,8 +867,12 @@ func getManualJobTriggersHTMLFrag(fullLogLink bool) (ret string) {
 
 	for _, k := range keys {
 		if len(cmdMap[k]) > 0 {
-			ret += fmt.Sprintf("<a href='%s' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
-				k, k, cmdMap[k])
+			//			ret += fmt.Sprintf("<a href='%s' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
+			//				k, k, cmdMap[k])
+			fn := strings.Replace(k, "-", "", -1)
+			//ret += fmt.Sprintf("<a href='' onclick='%s()' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
+			ret += fmt.Sprintf("<span class='xhrlink' onclick='%s()' title='Play Job'>[&rtrif;] %s [action %s]</span>\n",
+				/*k,*/ fn, k, cmdMap[k])
 		}
 	}
 	if fullLogLink {
@@ -925,6 +984,8 @@ func main() {
 		var jobEnv []string
 		var cmd string
 		if fields[0] != e {
+			// We use _ as field separator for jobOpts, jobID in workdir/ and
+			// artifacts/ dirs & job vars so they aren't allowed in the jobTag
 			tag = strings.Replace(fields[0], "_", "-", -1)
 			if len(fields) > 1 && len(fields) != 4 {
 				errStr := fmt.Sprintf("\n  [%s]\n"+
