@@ -70,7 +70,7 @@ In summary, to perform build/CI tasks with bacill&mu;s, one should
 * define endpoints, jobOpts and jobEnv config for each to pass
   to bacill&mu;s (see bacillus_launch.sh)
 
-## Storage
+## Scheduling, Storage and Artifact Management
 
 The design of bacill&mu;s follows the Unix tool philosophy: *do one thing and do it well*. As such, scheduling of repeated jobs and reaping of old job workspaces/artifacts to save disk space, archiving etc. are left to external tools (consider using cron, anacron, rsync, etc.). An example cron job to reap old workspaces and artifacts is described within the 'bacillus_launch.sh' script.
 
@@ -101,4 +101,10 @@ $ ./bacillus_launch.sh
 
 ```
 $ curl -s http://localhost:9990/blind/onPush_hkexsh_build
+```
+
+If ```--auth``` is used, the curl request will require credentials to activate the job endpoint, eg:
+
+```
+$ curl -s --netrc-file auth.txt http://localhost:9990/onPush-bacillus-env
 ```
