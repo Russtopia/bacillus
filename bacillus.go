@@ -82,7 +82,7 @@ func XHRCSSFrag() string {
 
 // Emit JS function suitable for calling from an html element
 // Typically used for an onclick event to fire off an async GET req.
-func pokeUriJSFrag(jsFuncName string, uri string) string {
+func xhrJSFrag(jsFuncName string, uri string, respHandlerJS string) string {
 	return `
 <script>
 	function ` + jsFuncName + `() {
@@ -90,7 +90,8 @@ func pokeUriJSFrag(jsFuncName string, uri string) string {
 		var xhttp = new XMLHttpRequest();
 		xhttp.onreadystatechange = function() {
 			if( this.readyState == 4 && this.status == 200 ) {
-				// whatevs, maybe give feedback to user
+					// whatevs, maybe give feedback to user
+					` + respHandlerJS + `
 			}
 		};
 		xhttp.open('GET', '` + uri + `', true);
@@ -275,6 +276,23 @@ func getCompatJS() string {
 	`
 }
 
+func xhrRunningJobsCountHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, fmt.Sprintf("%d", len(runningJobs)))
+}
+
+func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
+	tl := 4
+	v, ok := r.URL.Query()["tl"]
+	if ok {
+		fmt.Sscanf(v[0], "%d", &tl)
+	}
+	io.WriteString(w, getLiveRunLogHTMLFrag(tl))
+}
+
+// Get HTML for 'live' runlog with a specified # of tail lines
+// Mean to be inserted within a serve-out complete HTML page
+// (for just an HTML fragment to be inserted by client-side
+//  see xurLiveRunLogHandler())
 func getLiveRunLogHTMLFrag(tl int) (ret string) {
 	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 
@@ -290,13 +308,11 @@ func getLiveRunLogHTMLFrag(tl int) (ret string) {
 	// (only 'live' view)
 	tailLines = patchCompletedJobsInLog(tailLines, tl)
 
-	//ret += "<pre>\n"
 	if tl == 0 || tailCount < tl {
 		ret += strings.Join(tailLines, "\n")
 	} else {
 		ret += strings.Join(tailLines[tailCount-tl:], "\n")
 	}
-	//ret += "</pre>\n"
 
 	return
 }
@@ -309,20 +325,19 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 
 	io.WriteString(w, `
 <html>
-<head>
-<meta http-equiv="refresh" content="10">`+
+<head>`+
 		getFavIcon()+
 		getRunLogCSS()+
 		XHRCSSFrag()+
+		xhrJSFrag("xhrLiveRunLogUpdate", fmt.Sprintf("/lru?tl=%d",runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
 		getShortLogoHeaderHTMLFrag()+`
 </head>
-<body `+getBodyBgndHTMLFrag()+`>
-	`)
-
+<body `+getBodyBgndHTMLFrag()+`>`)
 	io.WriteString(w, getManualJobTriggersHTMLFrag(true)+
-		`<pre>`+getLiveRunLogHTMLFrag(runLogTailLines)+`</pre>`)
+		`<pre id='liveRunLog'>`+getLiveRunLogHTMLFrag(runLogTailLines)+`</pre>`)
 
 	io.WriteString(w, getManualJobTriggersJSFrag())
+	io.WriteString(w, `<script>setInterval( xhrLiveRunLogUpdate, 1000 ); setInterval( xhrRunningJobsCount, 1000 ); </script>`)
 	io.WriteString(w, `
 </body>
 </html>
@@ -376,8 +391,6 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if true {
-
 	// Read file from URL, removing leading / as workdir is rel to us
 	consoleLog, e := ioutil.ReadFile(fmt.Sprintf("%s", r.URL)[1:])
 	if e != nil {
@@ -387,7 +400,6 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 
 	lines := strings.Split(string(consoleLog), "\n")
 	// Prevent log output from creating huge web pages.
-	// TODO: Add logic to link to full console log on first line
 	tailL := 34
 	l := len(lines) - tailL
 	if l < 0 {
@@ -793,7 +805,9 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <html>
 <head>`+
 		getFavIcon()+
-		getRefreshJS('r', "5")+
+		/*getRefreshJS('r', "10")+*/
+		xhrJSFrag("xhrLiveRunLogUpdate", "/lru?tl=5", `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		xhrJSFrag("xhrRunningJobsCount", "/rjc", `document.getElementById('liveRunLogCount').innerHTML = xhttp.response;`)+
 		XHRCSSFrag()+`
 </head>
   <body `+getBodyBgndHTMLFrag()+`>
@@ -804,9 +818,9 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <a href='/runlog'>/runlog</a>: main log/activity view
 <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
   
-Latest Job Activity (Running jobs:`+fmt.Sprintf("%d", len(runningJobs))+`)
+Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span>)
 ...
-`+getLiveRunLogHTMLFrag(5)+`
+<span id='liveRunLog'>`+getLiveRunLogHTMLFrag(5)+`</span>
   LEGEND
   [&rtrif;] Start a job manually
   [&cross;] Cancel a running job
@@ -829,6 +843,7 @@ Jobs Served (click Play to manually trigger)`+getManualJobTriggersHTMLFrag(false
   </pre>`)
 
 	io.WriteString(w, getManualJobTriggersJSFrag())
+	io.WriteString(w, `<script>setInterval( xhrLiveRunLogUpdate, 1000 ); setInterval( xhrRunningJobsCount, 1000 ); </script>`)
 	io.WriteString(w, `
 </body>
 </html>
@@ -851,7 +866,7 @@ func getManualJobTriggersJSFrag() (ret string) {
 	for _, k := range keys {
 		if len(cmdMap[k]) > 0 {
 			fn := strings.Replace(k, "-", "", -1)
-			ret += pokeUriJSFrag(fn, k)
+			ret += xhrJSFrag(fn, k, "")
 		}
 	}
 	return
@@ -1041,6 +1056,11 @@ func main() {
 
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
+
+	// Endpoint for XHR live run log updates
+	http.HandleFunc("/lru", xhrLiveRunLogHandler)
+	// Endpoint for XHR live run log updates
+	http.HandleFunc("/rjc", xhrRunningJobsCountHandler)
 
 	// Enter shutdown mode (stop launching new jobs)
 	http.HandleFunc("/shutdown", shutdownHandler)
