@@ -113,7 +113,7 @@ $ ./bacillus_launch.sh
 [terminal B - client event test]
 
 ```
-$ curl -s http://localhost:9990/blind/onPush_hkexsh_build
+$ curl -s http://localhost:9990/blind/onPush-hkexsh-build
 ```
 
 If ```--auth``` is used, the curl request will require credentials to activate the job endpoint, eg:
