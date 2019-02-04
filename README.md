@@ -16,7 +16,7 @@ bacill&mu;s is language-agnostic. Any script or binary that can be launched from
 
 If you want a point-and-click build server that lets you make jobs without knowing what a shell or cron scheduler is, this probably isn't for you. But if you want a build server that serves as a launch point, has a minimal but useful web interface, and otherwise *stays out of your way*, read on.
 
-### Building and Installing
+## Building and Installing
 
 * Install recent version of Go, v1.11 or newer recommended
 * Login as user account that will run bacill&mu;s
@@ -69,6 +69,19 @@ In summary, to perform build/CI tasks with bacill&mu;s, one should
 * add job scripts to workdir/ to perform the intended tasks
 * define endpoints, jobOpts and jobEnv config for each to pass
   to bacill&mu;s (see bacillus_launch.sh)
+
+## Job Environment
+
+Jobs launched by bacill&mu;s get some default environment variables, which should be sufficient to bootstrap typical jobs:
+
+* **USER** - user under which daemon runs
+* **HOME** - home dir of user under which daemon runs
+* **BACILLUS_JOBID** - numerical ID which is the tempDir() suffix added to workdir/ and artifacts/ dir
+* **BACILLUS_JOBTAG** - the 'endpoint tag' specified in the launch arguments for the daemon binding a job to a run script
+* **BACILLUS_ARTFDIR** - the *relative* path from the job's launch workdir to the directory where it should, if required, store artifacts
+* **NOTE**: All other env vars normally defined for **$USER**, as if logged in via shell, are also given to jobs.
+
+A single run of a job will have workdir/ and artifacts/ dirs named ${BACILLUS_JOBTAG}_<jobOpts>_${BACILLUS_JOBID}.
 
 ## Scheduling, Storage and Artifact Management
 
