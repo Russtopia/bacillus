@@ -90,7 +90,7 @@ fi
 
 bacillus -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
  -auth=${AUTH} -u=${AUTH_USER} -p=${AUTH_PASS} \
- onPush_bacillus_build:kD::"../bacillus_pushbuild.sh" \
- onPush_hkexsh_build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
- onPush_bacillus_artifact:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh" \
- onPush_bacillus_env:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"env"
+ onPush-bacillus-build:kD::"../bacillus_pushbuild.sh" \
+ onPush-hkexsh-build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
+ onPush-bacillus-artifact:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh" \
+ onPush-bacillus-env:kD:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"env"

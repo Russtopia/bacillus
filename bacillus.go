@@ -798,7 +798,7 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
      Happy Build Automating, DevOps-ing, or whatever it's called these days...
 	 
   Oh, and in case you need to...
-  <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
+  <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>   (afterwards, use <strong>/rudeshutdown</strong>)
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
   <a href='`+logoutURI+`'>logout</a>
   

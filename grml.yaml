@@ -22,7 +22,7 @@ commands:
       echo "TODO: cp binary and docs to ${releaseDir}"
 
   install:
-    help: install binaries (root)
+    help: install binaries
     deps:
       - app
     as-root: false
