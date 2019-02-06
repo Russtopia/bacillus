@@ -66,7 +66,7 @@ type RunningJobList map[string]string
 // I didn't design this thing up-front, I wrote it to scratch an itch.
 // That's what 'agile design' gets you :p
 
-func XHRCSSFrag() string {
+func xhrlinkCSSFrag() string {
 	return `<style>
 		span.xhrlink:hover {
 				text-decoration: underline;
@@ -82,7 +82,7 @@ func XHRCSSFrag() string {
 
 // Emit JS function suitable for calling from an html element
 // Typically used for an onclick event to fire off an async GET req.
-func xhrJSFrag(jsFuncName string, uri string, respHandlerJS string) string {
+func xmlHTTPRequester(jsFuncName string, uri string, respHandlerJS string) string {
 	return `
 <script>
 	function ` + jsFuncName + `() {
@@ -100,38 +100,45 @@ func xhrJSFrag(jsFuncName string, uri string, respHandlerJS string) string {
 </script>`
 }
 
-func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
-	w.Header().Set("Cache-Control", "no-cache")
-
-	if !basicAuth {
-		return true
-	}
-
-	u, p, ok := r.BasicAuth()
-	if ok && u == strUser && p == strPasswd {
-		return true
-	} else {
-		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Not logged in.")
-	}
-	return
+func xhrRunningJobsCountHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, fmt.Sprintf("%d", len(runningJobs)))
 }
 
-func getFavIcon() string {
+func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
+	tl := 4
+	v, ok := r.URL.Query()["tl"]
+	if ok {
+		fmt.Sscanf(v[0], "%d", &tl)
+	}
+	io.WriteString(w, liveRunLogHTML(tl))
+}
+
+
+func favIconHTML() string {
 	return `<link rel="icon" type="image/jpg" href="/images/logo.jpg"/>`
 }
 
-func getBodyBgndHTMLFrag() string {
+func logoShortHdrHTML() string {
+	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
+}
+
+func logoHdrHTML() string {
+	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
+}
+
+func bodyBgndHTMLAttribs() string {
 	if shutdownModeActive {
 		return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus-shutdown.jpg"); background-size: cover;'`
 	}
 	return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus.jpg"); background-size: cover;'`
 }
 
-// getGoBackHeaderJS() returns a JS fragment to make a page go back after a
+
+
+
+// goBackJS() returns a JS fragment to make a page go back after a
 // short delay.
-func getGoBackHeaderJS(ms string) string {
+func goBackJS(ms string) string {
 	return fmt.Sprintf(`
 <script>
   // Go back after a short delay
@@ -140,7 +147,7 @@ func getGoBackHeaderJS(ms string) string {
 `, ms)
 }
 
-func getRefreshJS(stat rune, intervalSecs string) string {
+func refreshJS(stat rune, intervalSecs string) string {
 	if stat == 'r' {
 		return `<meta http-equiv="refresh" content="` + intervalSecs + `">`
 	} else {
@@ -148,58 +155,8 @@ func getRefreshJS(stat rune, intervalSecs string) string {
 	}
 }
 
-func getSpinnerJS(stat rune, codeColor, statWord string) string {
-	if stat == 'r' {
-		return `<script>
-////////////////////////
-appendSpinner = function() {
-  var spinners = [
-    "|/-\\",
-    ".oO@*",
-    [">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
-  ];
 
-  var el = document.createElement('div');
-  el.setAttribute('id', 'spinner');
-  document.body.appendChild(el);
-  el.innerHTML = '.';
-  var spinner = spinners[0];
-  
-  (function(spinner,el) {
-    var i = 0;
-    setInterval(function() {
-      el.innerHTML = spinner[i];
-      i = (i + 1) % spinner.length;
-    }, 300);
-  })(spinner,el);
-}
-////////////////////////
-</script>`
-	} else {
-		return `<script>
-		////////////////////////
-appendSpinner = function() {
-  var el = document.createElement('div');
-  el.setAttribute('id', '` + codeColor + `');
-  el.innerHTML = '` + statWord + `';
-  document.body.appendChild(el);
-}
-////////////////////////
-</script>`
-	}
-}
-
-func getRunLogCSS() string {
-	return `
-		<style>
-		a:link { text-decoration:none; }
-		a:hover { text-decoration:underline; }
-		a:active { text-decoration:underline; }
-		</style>
-		`
-}
-
-func getStyleCSS() string {
+func consActiveSpinnerCSS() string {
 	return `
   <style>
     #spinner {
@@ -248,13 +205,49 @@ func getStyleCSS() string {
   `
 }
 
-// TODO: types for matching JSON events of
-// supported webhooks: gogs.io, github, gitlab, ... ?
-// For now, the 'blind' endpoint is the only one supported,
-// meaning the request can't communicate any extra data to the
-// job invocation in a GET or POST request.
+func consActiveSpinnerJS(stat rune, codeColor, statWord string) string {
+	if stat == 'r' {
+		return `<script>
+////////////////////////
+appendSpinner = function() {
+  var spinners = [
+    "|/-\\",
+    ".oO@*",
+    [">))'>"," >))'>","  >))'>","   >))'>","    >))'>","   <'((<","  <'((<"," <'((<"],
+  ];
 
-func getCompatJS() string {
+  var el = document.createElement('div');
+  el.setAttribute('id', 'spinner');
+  document.body.appendChild(el);
+  el.innerHTML = '.';
+  var spinner = spinners[0];
+  
+  (function(spinner,el) {
+    var i = 0;
+    setInterval(function() {
+      el.innerHTML = spinner[i];
+      i = (i + 1) % spinner.length;
+    }, 300);
+  })(spinner,el);
+}
+////////////////////////
+</script>`
+	} else {
+		return `<script>
+		////////////////////////
+appendSpinner = function() {
+  var el = document.createElement('div');
+  el.setAttribute('id', '` + codeColor + `');
+  el.innerHTML = '` + statWord + `';
+  document.body.appendChild(el);
+}
+////////////////////////
+</script>`
+	}
+}
+
+
+func compatJS() string {
 	return `
     <script>
     bodyOrHtml = function() {
@@ -276,24 +269,11 @@ func getCompatJS() string {
 	`
 }
 
-func xhrRunningJobsCountHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, fmt.Sprintf("%d", len(runningJobs)))
-}
-
-func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
-	tl := 4
-	v, ok := r.URL.Query()["tl"]
-	if ok {
-		fmt.Sscanf(v[0], "%d", &tl)
-	}
-	io.WriteString(w, getLiveRunLogHTMLFrag(tl))
-}
-
 // Get HTML for 'live' runlog with a specified # of tail lines
 // Mean to be inserted within a serve-out complete HTML page
 // (for just an HTML fragment to be inserted by client-side
 //  see xurLiveRunLogHandler())
-func getLiveRunLogHTMLFrag(tl int) (ret string) {
+func liveRunLogHTML(tl int) (ret string) {
 	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 
 	// Split log into header and the rest, with endpoints
@@ -317,6 +297,78 @@ func getLiveRunLogHTMLFrag(tl int) (ret string) {
 	return
 }
 
+
+func manualJobTriggersJS() (ret string) {
+	// Put in the click JS functions first
+	keys := make([]string, len(cmdMap))
+	for k := range cmdMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		if len(cmdMap[k]) > 0 {
+			fn := strings.Replace(k, "-", "", -1)
+			ret += xmlHTTPRequester(fn, k, "")
+			ret += `<script>
+			setInterval( xhrLiveRunLogUpdate, 1000 );
+			setInterval( xhrRunningJobsCount, 1000 );
+			</script>`
+		}
+	}
+	return
+}
+
+func manualJobTriggersHTML(fullLogLink bool) (ret string) {
+	ret = "<pre style='background-color: skyblue;'>"
+	keys := make([]string, len(cmdMap))
+	for k := range cmdMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		if len(cmdMap[k]) > 0 {
+			//			ret += fmt.Sprintf("<a href='%s' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
+			//				k, k, cmdMap[k])
+			fn := strings.Replace(k, "-", "", -1)
+			//ret += fmt.Sprintf("<a href='' onclick='%s()' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
+			ret += fmt.Sprintf("<span class='xhrlink' onclick='%s()' title='Play Job'>[&rtrif;] %s [action %s]</span>\n",
+				/*k,*/ fn, k, cmdMap[k])
+		}
+	}
+	if fullLogLink {
+		ret += "<a href='/fullrunlog'>... click for full runlog ...</a>"
+	}
+	ret += "</pre>"
+	return
+}
+
+
+func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
+	w.Header().Set("Cache-Control", "no-cache")
+
+	if !basicAuth {
+		return true
+	}
+
+	u, p, ok := r.BasicAuth()
+	if ok && u == strUser && p == strPasswd {
+		return true
+	} else {
+		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Not logged in.")
+	}
+	return
+}
+
+// TODO: types for matching JSON events of
+// supported webhooks: gogs.io, github, gitlab, ... ?
+// For now, the 'blind' endpoint is the only one supported,
+// meaning the request can't communicate any extra data to the
+// job invocation in a GET or POST request.
+
 func runLogHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/html")
 	if !httpAuthSession(w, r) {
@@ -326,18 +378,16 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 <html>
 <head>`+
-		getFavIcon()+
-		getRunLogCSS()+
-		XHRCSSFrag()+
-		xhrJSFrag("xhrLiveRunLogUpdate", fmt.Sprintf("/lru?tl=%d",runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
-		getShortLogoHeaderHTMLFrag()+`
+		favIconHTML()+
+		xhrlinkCSSFrag()+
+		xmlHTTPRequester("xhrLiveRunLogUpdate", fmt.Sprintf("/api/lru?tl=%d",runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		logoShortHdrHTML()+`
 </head>
-<body `+getBodyBgndHTMLFrag()+`>`)
-	io.WriteString(w, getManualJobTriggersHTMLFrag(true)+
-		`<pre id='liveRunLog'>`+getLiveRunLogHTMLFrag(runLogTailLines)+`</pre>`)
+<body `+bodyBgndHTMLAttribs()+`>`)
+	io.WriteString(w, manualJobTriggersHTML(true)+
+		`<pre id='liveRunLog'>`+liveRunLogHTML(runLogTailLines)+`</pre>`)
 
-	io.WriteString(w, getManualJobTriggersJSFrag())
-	io.WriteString(w, `<script>setInterval( xhrLiveRunLogUpdate, 1000 ); setInterval( xhrRunningJobsCount, 1000 ); </script>`)
+	io.WriteString(w, manualJobTriggersJS())
 	io.WriteString(w, `
 </body>
 </html>
@@ -358,8 +408,8 @@ func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `
 <html>
 <head>`+
-		getFavIcon()+
-		getShortLogoHeaderHTMLFrag()+`
+		favIconHTML()+
+		logoShortHdrHTML()+`
 </head>
 <body>`)
 
@@ -438,11 +488,11 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 <html>
 <head>
 `+
-		getFavIcon()+
-		getRefreshJS(stat, "5")+
-		getStyleCSS()+
-		getCompatJS()+
-		getSpinnerJS(stat, codeColor, statWord)+
+		favIconHTML()+
+		refreshJS(stat, "5")+
+		compatJS()+
+		consActiveSpinnerCSS()+
+		consActiveSpinnerJS(stat, codeColor, statWord)+
 		`
   <script>
     window.onload = function() {
@@ -496,10 +546,10 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 			io.WriteString(w, `
 					<html>
 					<head>`+
-				getFavIcon()+
-				getGoBackHeaderJS("3000")+`
+				favIconHTML()+
+				goBackJS("3000")+`
 					</head>
-                    <body`+getBodyBgndHTMLFrag()+`>
+                    <body`+bodyBgndHTMLAttribs()+`>
 					`)
 			if shutdownModeActive {
 				io.WriteString(w, fmt.Sprintf("<pre>Server is in shutdown mode, come back later.</pre>\n"))
@@ -629,10 +679,10 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 								io.WriteString(w, `
 					<html>
 					<head>`+
-									getFavIcon()+
-									getGoBackHeaderJS("3000")+`
+									favIconHTML()+
+									goBackJS("3000")+`
 					</head>
-					<body `+getBodyBgndHTMLFrag()+`>
+					<body `+bodyBgndHTMLAttribs()+`>
 					`)
 								if jobCancellers[jobID] != nil {
 									jobCancellers[jobID]()
@@ -696,6 +746,128 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 				}
 			}()
 		})
+}
+
+func rootPageHandler(w http.ResponseWriter, r *http.Request) {
+	// See if there are actions (currently just logout)
+	_, ok := r.URL.Query()["logout"]
+	if ok {
+		w.Header().Set("Content-type", "text/html")
+		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		//io.WriteString(w, `<head><meta http-equiv="refresh" content="0;URL='/'" /></head>`)
+		io.WriteString(w, `<pre><a href='/'>You must log in.</a></pre>`)
+		return
+	}
+
+	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
+	io.WriteString(w, `
+<html>
+<head>`+
+		favIconHTML()+
+		/*refreshJS('r', "10")+*/
+		xmlHTTPRequester("xhrLiveRunLogUpdate", "/api/lru?tl=5", `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		xmlHTTPRequester("xhrRunningJobsCount", "/api/rjc", `document.getElementById('liveRunLogCount').innerHTML = xhttp.response;`)+
+		xhrlinkCSSFrag()+`
+</head>
+  <body `+bodyBgndHTMLAttribs()+`>
+		`)
+	io.WriteString(w, logoHdrHTML())
+	io.WriteString(w, `
+  <pre>
+<a href='/runlog'>/runlog</a>: main log/activity view
+<a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
+  
+Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span>)
+...
+<span id='liveRunLog'>`+liveRunLogHTML(5)+`</span>
+  LEGEND
+  [&rtrif;] Start a job manually
+  [&cross;] Cancel a running job
+  [&ccupssm;] View completed job artifacts
+  [&ccups;] View partial artifacts for a failed job
+  [&acd;] Job is running - click to view
+  [&check;] Job completed with OK(0) status - click to view
+  <span style='background-color:red'>[!]</span> Job completed with nonzero status - click to view
+
+  .. that's about it.
+     Happy Build Automating, DevOps-ing, or whatever it's called these days...
+	 
+  Oh, and in case you need to...
+  <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
+  <a href='/cancelshutdown'>cancel a planned shutdown</a>
+  <a href='`+logoutURI+`'>logout</a>
+  
+Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
+  <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
+  </pre>`)
+
+	io.WriteString(w, manualJobTriggersJS())
+	io.WriteString(w, `
+</body>
+</html>
+	`)
+}
+
+// This hack is from https://stackoverflow.com/a/14329930/1012159
+var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.execCommand("ClearAuthenticationCache")}catch(d){}a||((a=window.XMLHttpRequest?new window.XMLHttpRequest:window.ActiveXObject?new ActiveXObject("Microsoft.XMLHTTP"):void 0)?(a.open("HEAD",c||location.href,!0,"logout",(new Date).getTime().toString()),a.send(""),a=1):a=void 0);a||(b="Your browser is too old or too weird to support log out functionality. Close all windows and restart the browser.");alert(b)})(/*pass safeLocation here if you need*/);`
+//var logoutURI = `/?logout`
+
+func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	shutdownModeActive = false
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		favIconHTML()+
+		goBackJS("3000")+`
+					</head>
+                    <body`+bodyBgndHTMLAttribs()+`>
+					`)
+	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
+	io.WriteString(w, `
+					</body>
+					</html>`)
+}
+
+func shutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	shutdownModeActive = true
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		favIconHTML()+
+		goBackJS("3000")+`
+					</head>
+                    <body`+bodyBgndHTMLAttribs()+`>
+					`)
+	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
+	io.WriteString(w, `
+					</body>
+					</html>`)
+}
+
+func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	w.Header().Set("Content-type", "text/html")
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		favIconHTML()+`
+					</head>
+                    <body`+bodyBgndHTMLAttribs()+`>
+					`)
+	io.WriteString(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
+	io.WriteString(w, `
+					</body>
+					</html>`)
+	killSwitch <- true
 }
 
 //FIXME: There is definitely a less copy-intensive way to do this.
@@ -764,190 +936,6 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 		}
 	}
 	return fixed
-}
-
-//func getRecentJobRuns() (list []string) {
-//	// for f in $(find workdir -type f -name "console.out"); do head -3 $f | tail -1; done
-//	return
-//}
-
-func getShortLogoHeaderHTMLFrag() string {
-	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
-}
-
-func getLongLogoHeaderHTMLFrag() string {
-	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
-}
-
-//func logoutPageHandler(w http.ResponseWriter, r *http.Request) {
-//	io.WriteString(w, "<a href='/?logout'>Click to logout</a>")
-//	return
-//}
-
-func rootPageHandler(w http.ResponseWriter, r *http.Request) {
-	// See if there are actions (currently just logout)
-	_, ok := r.URL.Query()["logout"]
-	if ok {
-		w.Header().Set("Content-type", "text/html")
-		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
-		w.WriteHeader(http.StatusUnauthorized)
-		//io.WriteString(w, `<head><meta http-equiv="refresh" content="0;URL='/'" /></head>`)
-		io.WriteString(w, `<pre><a href='/'>You must log in.</a></pre>`)
-		return
-	}
-
-	w.Header().Set("Content-type", "text/html")
-	if !httpAuthSession(w, r) {
-		return
-	}
-
-	io.WriteString(w, `
-<html>
-<head>`+
-		getFavIcon()+
-		/*getRefreshJS('r', "10")+*/
-		xhrJSFrag("xhrLiveRunLogUpdate", "/lru?tl=5", `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
-		xhrJSFrag("xhrRunningJobsCount", "/rjc", `document.getElementById('liveRunLogCount').innerHTML = xhttp.response;`)+
-		XHRCSSFrag()+`
-</head>
-  <body `+getBodyBgndHTMLFrag()+`>
-		`)
-	io.WriteString(w, getLongLogoHeaderHTMLFrag())
-	io.WriteString(w, `
-  <pre>
-<a href='/runlog'>/runlog</a>: main log/activity view
-<a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
-  
-Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span>)
-...
-<span id='liveRunLog'>`+getLiveRunLogHTMLFrag(5)+`</span>
-  LEGEND
-  [&rtrif;] Start a job manually
-  [&cross;] Cancel a running job
-  [&ccupssm;] View completed job artifacts
-  [&ccups;] View partial artifacts for a failed job
-  [&acd;] Job is running - click to view
-  [&check;] Job completed with OK(0) status - click to view
-  <span style='background-color:red'>[!]</span> Job completed with nonzero status - click to view
-
-  .. that's about it.
-     Happy Build Automating, DevOps-ing, or whatever it's called these days...
-	 
-  Oh, and in case you need to...
-  <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>
-  <a href='/cancelshutdown'>cancel a planned shutdown</a>
-  <a href='`+logoutURI+`'>logout</a>
-  
-Jobs Served (click Play to manually trigger)`+getManualJobTriggersHTMLFrag(false)+`
-  <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
-  </pre>`)
-
-	io.WriteString(w, getManualJobTriggersJSFrag())
-	io.WriteString(w, `<script>setInterval( xhrLiveRunLogUpdate, 1000 ); setInterval( xhrRunningJobsCount, 1000 ); </script>`)
-	io.WriteString(w, `
-</body>
-</html>
-	`)
-}
-
-// This hack is from https://stackoverflow.com/a/14329930/1012159
-var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.execCommand("ClearAuthenticationCache")}catch(d){}a||((a=window.XMLHttpRequest?new window.XMLHttpRequest:window.ActiveXObject?new ActiveXObject("Microsoft.XMLHTTP"):void 0)?(a.open("HEAD",c||location.href,!0,"logout",(new Date).getTime().toString()),a.send(""),a=1):a=void 0);a||(b="Your browser is too old or too weird to support log out functionality. Close all windows and restart the browser.");alert(b)})(/*pass safeLocation here if you need*/);`
-
-//var logoutURI = `/?logout`
-
-func getManualJobTriggersJSFrag() (ret string) {
-	// Put in the click JS functions first
-	keys := make([]string, len(cmdMap))
-	for k := range cmdMap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		if len(cmdMap[k]) > 0 {
-			fn := strings.Replace(k, "-", "", -1)
-			ret += xhrJSFrag(fn, k, "")
-		}
-	}
-	return
-}
-
-func getManualJobTriggersHTMLFrag(fullLogLink bool) (ret string) {
-	ret = "<pre style='background-color: skyblue;'>"
-	keys := make([]string, len(cmdMap))
-	for k := range cmdMap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		if len(cmdMap[k]) > 0 {
-			//			ret += fmt.Sprintf("<a href='%s' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
-			//				k, k, cmdMap[k])
-			fn := strings.Replace(k, "-", "", -1)
-			//ret += fmt.Sprintf("<a href='' onclick='%s()' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
-			ret += fmt.Sprintf("<span class='xhrlink' onclick='%s()' title='Play Job'>[&rtrif;] %s [action %s]</span>\n",
-				/*k,*/ fn, k, cmdMap[k])
-		}
-	}
-	if fullLogLink {
-		ret += "<a href='/fullrunlog'>... click for full runlog ...</a>"
-	}
-	ret += "</pre>"
-	return
-}
-
-func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
-	shutdownModeActive = false
-	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, `
-					<html>
-					<head>`+
-		getFavIcon()+
-		getGoBackHeaderJS("3000")+`
-					</head>
-                    <body`+getBodyBgndHTMLFrag()+`>
-					`)
-	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
-	io.WriteString(w, `
-					</body>
-					</html>`)
-}
-
-func shutdownHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
-	shutdownModeActive = true
-	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, `
-					<html>
-					<head>`+
-		getFavIcon()+
-		getGoBackHeaderJS("3000")+`
-					</head>
-                    <body`+getBodyBgndHTMLFrag()+`>
-					`)
-	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
-	io.WriteString(w, `
-					</body>
-					</html>`)
-}
-
-func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
-	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, `
-					<html>
-					<head>`+
-		getFavIcon()+`
-					</head>
-                    <body`+getBodyBgndHTMLFrag()+`>
-					`)
-	io.WriteString(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
-	io.WriteString(w, `
-					</body>
-					</html>`)
-	killSwitch <- true
 }
 
 func main() {
@@ -1057,11 +1045,6 @@ func main() {
 	// Similarly, a single endpoint handles static full job output
 	http.HandleFunc("/"+jobHomeDir+"/fullconsole/", fullConsoleHandler)
 
-	// Endpoint for XHR live run log updates
-	http.HandleFunc("/lru", xhrLiveRunLogHandler)
-	// Endpoint for XHR live run log updates
-	http.HandleFunc("/rjc", xhrRunningJobsCountHandler)
-
 	// Enter shutdown mode (stop launching new jobs)
 	http.HandleFunc("/shutdown", shutdownHandler)
 
@@ -1070,6 +1053,11 @@ func main() {
 
 	// Rude exit (regardless of running jobs)
 	http.HandleFunc("/rudeshutdown", rudeShutdownHandler)
+
+	// Endpoint for XHR live run log updates
+	http.HandleFunc("/api/lru", xhrLiveRunLogHandler)
+	// Endpoint for XHR live run log updates
+	http.HandleFunc("/api/rjc", xhrRunningJobsCountHandler)
 
 	//// Logout sequence page
 	//http.HandleFunc("/logout", logoutPageHandler)

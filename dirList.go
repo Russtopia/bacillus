@@ -147,9 +147,9 @@ func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
 	//hdrs["X-Foo"] = "bacillus dir listing"
 	preamble = `
 	<head>` +
-		getFavIcon() + `
+		favIconHTML() + `
 	</head>
-	<body ` + getBodyBgndHTMLFrag() + `>
+	<body ` + bodyBgndHTMLAttribs() + `>
 	<img style="float:left;" width="16px" src="/images/logo.jpg"/><pre style='background-color: grey;'><a class="go-http-fs-home" href="/">bacill&mu;s ` + appVer + `</a> ---- directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
 	<pre>`
 	return
