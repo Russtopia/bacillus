@@ -94,9 +94,9 @@ To keep different categories of jobs logically separated and more manageable, co
 
 ## Access Control
 
-If launched with the ```--auth``` option, bacill&mu;s gates access to all served content via HTTP basic auth. Over plain HTTP this doesn't offer any real security, but running behind a reverse proxy (the recommended configuration), the HTML UI for manually triggering jobs, viewing status and artifacts, and controlling soft and hard shutdowns -- as well as git/SCM triggered endpoint actions to run jobs -- are all protected from unauthorized use. See the AUTH options in the example bacillus_launch.sh.
+If launched with the ```--auth``` option, bacill&mu;s gates access to all served content via HTTP basic auth. Over plain HTTP this is not secure, so one should run behind a reverse proxy (eg., define a subdomain 'bacillus.yourdomain.net' mapping to 'localhost:9990'). This protects the HTML UI for manually triggering jobs, viewing status and artifacts, and controlling soft and hard shutdowns, as well as git/SCM triggered endpoint actions to run jobs. See the AUTH options in the example bacillus_launch.sh.
 
-For scripts and SCM hooks, to trigger an endpoint (job) via eg. ```wget``` or ```curl```, an initial login request must first be made to the bacill&mu;s server, which will reply with an HTTP basic auth challenge and the text ```Auth Required```. Subsequent requests made with the proper username:password then can proceed. See bacillus_launch.sh for more information.
+For scripts and SCM hooks, to trigger an endpoint (job) via eg. ```wget``` or ```curl```, an initial login request must first be made to the bacill&mu;s server, which will reply with an HTTP basic auth challenge and the text ```Not logged in.```. Subsequent requests made with the proper username:password then can proceed. See bacillus_launch.sh for more information.
 
 
 ## Example Run
