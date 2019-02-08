@@ -55,6 +55,26 @@ var (
 	//playSeq  string
 
 	jobCancellers map[string]func()
+
+	instColours = []string{
+		"floralwhite",
+		"burlywood",
+		"cadetblue",
+		"chocolate",
+		"coral",
+		"cornflowerblue",
+		"cornsilk",
+		"darkcyan",
+		"darkgoldenrod",
+		"darkgrey",
+		"darkkhaki",
+		"darkorange",
+		"darksalmon",
+		"darkseagreen",
+		"darkturquoise",
+		"gainsboro",
+		"gold",
+		"goldenrod"}
 )
 
 type RunningJobList map[string]string
@@ -113,7 +133,6 @@ func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, liveRunLogHTML(tl))
 }
 
-
 func favIconHTML() string {
 	return `<link rel="icon" type="image/jpg" href="/images/logo.jpg"/>`
 }
@@ -133,9 +152,6 @@ func bodyBgndHTMLAttribs() string {
 	return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus.jpg"); background-size: cover;'`
 }
 
-
-
-
 // goBackJS() returns a JS fragment to make a page go back after a
 // short delay.
 func goBackJS(ms string) string {
@@ -154,7 +170,6 @@ func refreshJS(stat rune, intervalSecs string) string {
 		return ``
 	}
 }
-
 
 func consActiveSpinnerCSS() string {
 	return `
@@ -246,7 +261,6 @@ appendSpinner = function() {
 	}
 }
 
-
 func compatJS() string {
 	return `
     <script>
@@ -297,7 +311,6 @@ func liveRunLogHTML(tl int) (ret string) {
 	return
 }
 
-
 func manualJobTriggersJS() (ret string) {
 	// Put in the click JS functions first
 	keys := make([]string, len(cmdMap))
@@ -344,7 +357,6 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 	return
 }
 
-
 func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 	w.Header().Set("Cache-Control", "no-cache")
 
@@ -380,7 +392,7 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 <head>`+
 		favIconHTML()+
 		xhrlinkCSSFrag()+
-		xmlHTTPRequester("xhrLiveRunLogUpdate", fmt.Sprintf("/api/lru?tl=%d",runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		xmlHTTPRequester("xhrLiveRunLogUpdate", fmt.Sprintf("/api/lru?tl=%d", runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
 		logoShortHdrHTML()+`
 </head>
 <body `+bodyBgndHTMLAttribs()+`>`)
@@ -516,27 +528,202 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 `)
 }
 
-func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
-	instColours := []string{
-		"floralwhite",
-		"burlywood",
-		"cadetblue",
-		"chocolate",
-		"coral",
-		"cornflowerblue",
-		"cornsilk",
-		"darkcyan",
-		"darkgoldenrod",
-		"darkgrey",
-		"darkkhaki",
-		"darkorange",
-		"darksalmon",
-		"darkseagreen",
-		"darkturquoise",
-		"gainsboro",
-		"gold",
-		"goldenrod"}
+type jobCtx struct {
+	w       http.ResponseWriter
+	mainCtx context.Context
+	jobTag  string
+	jobOpts string
+	jobEnv  []string
+}
 
+func execJob(j jobCtx) {
+	// Some wrinkles in the exec.Command API: If there are no args,
+	// one must completely omit the args ... to avoid strange errors
+	// with some commands that see a blank "" arg and complain.
+	cmd := strings.Split(cmdMap[j.jobTag], " ")[0]
+	cmdStrList := strings.Split(cmdMap[j.jobTag], " ")[1:]
+	//fmt.Printf("%s %v\n", cmd, cmdStrList)
+	cmdCancelCtx, cmdCancelFunc := context.WithCancel(j.mainCtx)
+	defer cmdCancelFunc()
+	//var args string
+	var c *exec.Cmd
+	if len(cmdStrList) > 0 {
+		c = exec.CommandContext(cmdCancelCtx, cmd, strings.Join(cmdStrList, " "))
+	} else {
+		c = exec.CommandContext(cmdCancelCtx, cmd)
+	}
+
+	//var terr error
+	//var workDir string
+	var instColourIdx uint32
+	if indStyle == "colour" || indStyle == "both" {
+		instColourIdx = rand.Uint32() % uint32(len(instColours))
+		instCounter += 1
+	} else {
+		instColourIdx = 0
+	}
+	instColour := instColours[instColourIdx]
+
+	dirTmp, _ := filepath.Abs(jobHomeDir)
+	workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_%s_", j.jobOpts, j.jobTag))
+	c.Dir = workDir
+	jobID := strings.Split(workDir, "_")[3]
+	//fmt.Println("jobID:", jobID)
+	var indent int64
+	var indentStr string
+	if indStyle == "indent" || indStyle == "both" {
+		indent, _ = strconv.ParseInt(jobID, 10, 64)
+		indentStr = strings.Repeat("-", int(indent%8)+4)
+	}
+
+	if terr != nil {
+		log.Printf("[ERROR creating workdir (%s) for job %s trigger.]\n", terr, j.jobTag)
+	} else {
+		var workerOutputPath string
+		var workerOutputFile *os.File
+		consoleFName := "console.out"
+		workerOutputPath = workDir + "/" + consoleFName
+		workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s_%s/%s", jobHomeDir, j.jobOpts, j.jobTag, jobID, consoleFName)
+		if attachStdout {
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+		} else {
+			workerOutputFile, _ = os.Create(workerOutputPath)
+			c.Stdout = workerOutputFile
+			c.Stderr = workerOutputFile
+		}
+
+		c.Env = append(c.Env, fmt.Sprintf("USER=%s", os.Getenv("USER")))
+		c.Env = append(c.Env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
+		c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBID=%s", jobID))
+		c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBTAG=%s", j.jobTag))
+		c.Env = append(c.Env, fmt.Sprintf("BACILLUS_WORKDIR=%s", workDir))
+		c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s_%s", workDir, j.jobOpts, j.jobTag, jobID)))
+		c.Env = append(c.Env, j.jobEnv...)
+
+		// JOB STATUS METADATA PREPENDED TO console.out
+		// Job output status is encoded in first line of output log.
+		// [1 2]
+		//  1: state: r = running f = finished
+		//  2: completion status: <n> = exit status, 0 = success; else failure
+		//     status uses UNIX shell exit status convention (base 10 0-255))
+		//
+		// Line 2 is the relative path of the console.log file itself, used to
+		// build a link to it for the /fullconsole/ endpoint link
+		//
+		// Line 3 is the JOBTAG of the job generating this console.out, used
+		// by the top "/" endpoint to show recently active jobs (ie., those with
+		// workdirs still present)
+		//
+		_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
+		_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
+		_, err = fmt.Fprintf(c.Stdout, "%s\n", j.jobTag)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cerr := c.Start()
+		if cerr != nil {
+			log.Printf("[exec.Cmd: %+v]\n", c)
+			j.w.WriteHeader(500)
+			j.w.Write([]byte("ERR"))
+			log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
+				j.jobTag)
+		} else {
+			//runningJobCount += 1
+			runningJobs[jobID] = j.jobTag
+			jobCancellers[jobID] = cmdCancelFunc
+			j.w.Write([]byte("OK"))
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
+				jobID, instColour,
+				workerOutputRelPath,
+				indentStr,
+				j.jobTag, jobID,
+				jobID)
+		}
+		werr := c.Wait()
+		//runningJobCount -= 1
+		delete(runningJobs, jobID)
+
+		//jobCancellers[jobID]()
+		delete(jobCancellers, jobID)
+
+		if werr, ok := werr.(*exec.ExitError); ok {
+			// The program has exited with an exit code != 0
+
+			// This works on both Unix and Windows. Although package
+			// syscall is generally platform dependent, WaitStatus is
+			// defined for both Unix and Windows and in both cases has
+			// an ExitStatus() method with the same signature.
+			var exitStatus uint32
+			if status, ok := werr.Sys().(syscall.WaitStatus); ok {
+				exitStatus = uint32(status.ExitStatus())
+				// exec.Cmd automatically closes its files on exit, so we need to
+				// reopen here to write the status at offset 0
+				workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
+				fmt.Fprintf(workerOutputFile, "[f %03d]", int8(exitStatus))
+				//log.Print(c.Stderr /*stdErrBuffer*/)
+				//log.Printf("%s[Exit Status: %d]\n", indentStr, int32(exitStatus)) //#
+			}
+		} else {
+			// exec.Cmd automatically closes its files on exit, so we need to
+			// reopen here to write the status at offset 0
+			workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
+			fmt.Fprintf(workerOutputFile, "[f %03d]", 0)
+			//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
+		}
+
+		if werr == nil {
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
+				jobID, instColour,
+				workerOutputRelPath,
+				indentStr,
+				j.jobTag, jobID,
+				j.jobOpts, j.jobTag, jobID)
+		} else {
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
+				jobID, instColour,
+				workerOutputRelPath,
+				indentStr,
+				j.jobTag, jobID,
+				j.jobOpts, j.jobTag, jobID,
+				werr)
+		}
+	}
+}
+
+func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html")
+	if !httpAuthSession(w, r) {
+		return
+	}
+
+	v, ok := r.URL.Query()["id"]
+	jobID := "undefined"
+	if ok {
+		jobID = v[0]
+	}
+	io.WriteString(w, `
+					<html>
+					<head>`+
+		favIconHTML()+
+		goBackJS("3000")+`
+					</head>
+					<body `+bodyBgndHTMLAttribs()+`>
+					`)
+	if jobCancellers[jobID] != nil {
+		jobCancellers[jobID]()
+		io.WriteString(w, fmt.Sprintf("<pre>Cancelled jobID %s</pre>\n", jobID))
+	} else {
+		io.WriteString(w, fmt.Sprintf("<pre>jobID %s already done or not found.</pre>\n", jobID))
+	}
+	io.WriteString(w, `
+					</body>
+					</html>`)
+}
+
+func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
 	http.HandleFunc(fmt.Sprintf("/%s", jobTag),
 		func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-type", "text/html")
@@ -563,188 +750,7 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 					</body>
 					</html>`)
 
-			go func() {
-				// Some wrinkles in the exec.Command API: If there are no args,
-				// one must completely omit the args ... to avoid strange errors
-				// with some commands that see a blank "" arg and complain.
-				cmd := strings.Split(cmdMap[jobTag], " ")[0]
-				cmdStrList := strings.Split(cmdMap[jobTag], " ")[1:]
-				//fmt.Printf("%s %v\n", cmd, cmdStrList)
-				cmdCancelCtx, cmdCancelFunc := context.WithCancel(mainCtx)
-				defer cmdCancelFunc()
-				//var args string
-				var c *exec.Cmd
-				if len(cmdStrList) > 0 {
-					c = exec.CommandContext(cmdCancelCtx, cmd, strings.Join(cmdStrList, " "))
-				} else {
-					c = exec.CommandContext(cmdCancelCtx, cmd)
-				}
-
-				//var terr error
-				//var workDir string
-				var instColourIdx uint32
-				if indStyle == "colour" || indStyle == "both" {
-					instColourIdx = rand.Uint32() % uint32(len(instColours))
-					instCounter += 1
-				} else {
-					instColourIdx = 0
-				}
-				instColour := instColours[instColourIdx]
-
-				dirTmp, _ := filepath.Abs(jobHomeDir)
-				workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_%s_", jobOpts, jobTag))
-				c.Dir = workDir
-				jobID := strings.Split(workDir, "_")[3]
-				//fmt.Println("jobID:", jobID)
-				var indent int64
-				var indentStr string
-				if indStyle == "indent" || indStyle == "both" {
-					indent, _ = strconv.ParseInt(jobID, 10, 64)
-					indentStr = strings.Repeat("-", int(indent%8)+4)
-				}
-
-				if terr != nil {
-					log.Printf("[ERROR creating workdir (%s) for job %s trigger.]\n", terr, jobTag)
-				} else {
-					var workerOutputPath string
-					var workerOutputFile *os.File
-					consoleFName := "console.out"
-					workerOutputPath = workDir + "/" + consoleFName
-					workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s_%s/%s", jobHomeDir, jobOpts, jobTag, jobID, consoleFName)
-					if attachStdout {
-						c.Stdout = os.Stdout
-						c.Stderr = os.Stderr
-					} else {
-						workerOutputFile, _ = os.Create(workerOutputPath)
-						c.Stdout = workerOutputFile
-						c.Stderr = workerOutputFile
-					}
-
-					c.Env = append(c.Env, fmt.Sprintf("USER=%s", os.Getenv("USER")))
-					c.Env = append(c.Env, fmt.Sprintf("HOME=%s", os.Getenv("HOME")))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBID=%s", jobID))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_JOBTAG=%s", jobTag))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_WORKDIR=%s", workDir))
-					c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s_%s", workDir, jobOpts, jobTag, jobID)))
-					c.Env = append(c.Env, jobEnv...)
-
-					// JOB STATUS METADATA PREPENDED TO console.out
-					// Job output status is encoded in first line of output log.
-					// [1 2]
-					//  1: state: r = running f = finished
-					//  2: completion status: <n> = exit status, 0 = success; else failure
-					//     status uses UNIX shell exit status convention (base 10 0-255))
-					//
-					// Line 2 is the relative path of the console.log file itself, used to
-					// build a link to it for the /fullconsole/ endpoint link
-					//
-					// Line 3 is the JOBTAG of the job generating this console.out, used
-					// by the top "/" endpoint to show recently active jobs (ie., those with
-					// workdirs still present)
-					//
-					_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
-					_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
-					_, err = fmt.Fprintf(c.Stdout, "%s\n", jobTag)
-
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					cerr := c.Start()
-					if cerr != nil {
-						log.Printf("[exec.Cmd: %+v]\n", c)
-						w.WriteHeader(500)
-						w.Write([]byte("ERR"))
-						log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
-							jobTag)
-					} else {
-						//runningJobCount += 1
-						runningJobs[jobID] = jobTag
-						jobCancellers[jobID] = cmdCancelFunc
-						w.Write([]byte("OK"))
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/%s_%s_%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
-							jobID, instColour,
-							workerOutputRelPath,
-							indentStr,
-							jobTag, jobID,
-							jobOpts, jobTag, jobID)
-
-						// Spawn handler for /cancel/<jobID>
-						http.HandleFunc(fmt.Sprintf("/cancel/%s_%s_%s", jobOpts, jobTag, jobID),
-							func(w http.ResponseWriter, r *http.Request) {
-								w.Header().Set("Content-type", "text/html")
-								if !httpAuthSession(w, r) {
-									return
-								}
-								io.WriteString(w, `
-					<html>
-					<head>`+
-									favIconHTML()+
-									goBackJS("3000")+`
-					</head>
-					<body `+bodyBgndHTMLAttribs()+`>
-					`)
-								if jobCancellers[jobID] != nil {
-									jobCancellers[jobID]()
-									io.WriteString(w, fmt.Sprintf("<pre>Cancelled %s_%s_%s</pre>\n", jobOpts, jobTag, jobID))
-								} else {
-									io.WriteString(w, fmt.Sprintf("<pre>Job %s_%s_%s already done or not found.</pre>\n", jobOpts, jobTag, jobID))
-								}
-								io.WriteString(w, `
-					</body>
-					</html>`)
-							})
-					}
-					werr := c.Wait()
-					//runningJobCount -= 1
-					delete(runningJobs, jobID)
-
-					//jobCancellers[jobID]()
-					delete(jobCancellers, jobID)
-
-					if werr, ok := werr.(*exec.ExitError); ok {
-						// The program has exited with an exit code != 0
-
-						// This works on both Unix and Windows. Although package
-						// syscall is generally platform dependent, WaitStatus is
-						// defined for both Unix and Windows and in both cases has
-						// an ExitStatus() method with the same signature.
-						var exitStatus uint32
-						if status, ok := werr.Sys().(syscall.WaitStatus); ok {
-							exitStatus = uint32(status.ExitStatus())
-							// exec.Cmd automatically closes its files on exit, so we need to
-							// reopen here to write the status at offset 0
-							workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-							fmt.Fprintf(workerOutputFile, "[f %03d]", int8(exitStatus))
-							//log.Print(c.Stderr /*stdErrBuffer*/)
-							//log.Printf("%s[Exit Status: %d]\n", indentStr, int32(exitStatus)) //#
-						}
-					} else {
-						// exec.Cmd automatically closes its files on exit, so we need to
-						// reopen here to write the status at offset 0
-						workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-						fmt.Fprintf(workerOutputFile, "[f %03d]", 0)
-						//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
-					}
-
-					if werr == nil {
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
-							jobID, instColour,
-							workerOutputRelPath,
-							indentStr,
-							jobTag, jobID,
-							jobOpts, jobTag, jobID)
-					} else {
-						log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
-							jobID, instColour,
-							workerOutputRelPath,
-							indentStr,
-							jobTag, jobID,
-							jobOpts, jobTag, jobID,
-							werr)
-					}
-				}
-			}()
+			go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
 		})
 }
 
@@ -815,10 +821,11 @@ Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
 
 // This hack is from https://stackoverflow.com/a/14329930/1012159
 var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.execCommand("ClearAuthenticationCache")}catch(d){}a||((a=window.XMLHttpRequest?new window.XMLHttpRequest:window.ActiveXObject?new ActiveXObject("Microsoft.XMLHTTP"):void 0)?(a.open("HEAD",c||location.href,!0,"logout",(new Date).getTime().toString()),a.send(""),a=1):a=void 0);a||(b="Your browser is too old or too weird to support log out functionality. Close all windows and restart the browser.");alert(b)})(/*pass safeLocation here if you need*/);`
+
 //var logoutURI = `/?logout`
 
 func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
+	//fmt.Println(r.URL)
 	shutdownModeActive = false
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
@@ -836,7 +843,7 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
+	//fmt.Println(r.URL)
 	shutdownModeActive = true
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
@@ -854,7 +861,7 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
+	//fmt.Println(r.URL)
 	w.Header().Set("Content-type", "text/html")
 	io.WriteString(w, `
 					<html>
@@ -1039,6 +1046,9 @@ func main() {
 	// Live runlog is just the tail of full runlog
 	http.HandleFunc("/fullrunlog/", fullRunlogHandler)
 
+	// Endpoint to cancel a job
+	http.HandleFunc("/cancel/", jobCancelHandler)
+
 	// A single endpoint handles the 'live' job output
 	http.HandleFunc("/"+jobHomeDir+"/", consoleHandler)
 
@@ -1078,7 +1088,6 @@ func main() {
 	}()
 
 	// .. and wait for a rude shutdown if requested
-	k := <-killSwitch
-	fmt.Printf("Got rudeShutdown:%v\n", k)
+	_ = <-killSwitch
 	server.Shutdown(nil)
 }
