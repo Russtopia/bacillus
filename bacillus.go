@@ -806,9 +806,13 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
   Oh, and in case you need to...
   <a href='/shutdown'>halt any new jobs for a graceful shutdown</a>   (afterwards, use <strong>/rudeshutdown</strong>)
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
-  <a href='`+logoutURI+`'>logout</a>
-  
-Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
+`)
+	if basicAuth {
+		io.WriteString(w, `  <a href='`+logoutURI+`'>logout</a>
+`)
+	}
+	io.WriteString(w, `
+  Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
   <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
   </pre>`)
 

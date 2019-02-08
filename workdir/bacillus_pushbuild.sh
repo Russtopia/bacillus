@@ -25,4 +25,5 @@ cd bacillus
 
 go build .
 
+tar czvf ${BACILLUS_ARTFDIR}/bacillus.tgz .
 echo "--Done--"
