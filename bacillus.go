@@ -339,12 +339,55 @@ func manualJobTriggersJS() (ret string) {
 	return
 }
 
+// Scan script for build parameter form specifiers.
+// returns false if there are none, otherwise true
 func isParameterizedBuildScript(scriptFName string) bool {
-	if scriptFName == "../artifact.sh" {
-		return true
-	} else {
+	isParamJob := false
+	fileBytes, e := ioutil.ReadFile(jobHomeDir + strings.TrimPrefix(scriptFName, ".."))
+	if e != nil {
+		fmt.Println("Error:", e)
 		return false
 	}
+	lines := strings.Split(string(fileBytes), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "#-?") {
+			//TODO: just stub here to detect param builds
+			fmt.Println("script:", line)
+			isParamJob = true
+		} else if isParamJob {
+			break
+		}
+	}
+	return isParamJob
+}
+
+// Scan script for build parameter form specifiers.
+// returns false if there are none, otherwise true
+func genParameterizedBuildFormPage(scriptFName string) (ret string) {
+	paramJobLine := false
+	// TODO: error empty page w/link to go back on malformed form error
+	ret = `<html><body>OMG WTF BBQ.</body></html>`
+
+	fileBytes, e := ioutil.ReadFile(jobHomeDir + strings.TrimPrefix(scriptFName, ".."))
+	if e != nil {
+		fmt.Println("Error:", e)
+		return
+	}
+	lines := strings.Split(string(fileBytes), "\n")
+	for _, line := range lines {
+		// TODO: parse lines for "#-?" entries, build
+		// HTML page w/form to set params and pass to job
+		// via a submit link
+		if strings.HasPrefix(line, "#-?") {
+			//TODO: just stub here to detect param builds
+			fmt.Println("script:", line)
+			paramJobLine = true
+		} else if paramJobLine {
+			break
+		}
+	}
+	ret = `<html><body>This should be a form for the job.</body></html>`
+	return
 }
 
 func manualJobTriggersHTML(fullLogLink bool) (ret string) {
@@ -364,8 +407,8 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 			// launch endpoint
 			// ===================
 			if isParameterizedBuildScript(cmdMap[k]) {
-					ret += fmt.Sprintf("<a class='xhrlink' title='Play Job' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
-							k, k, cmdMap[k])
+				ret += fmt.Sprintf("<a class='xhrlink' title='Play Job' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
+					k, k, cmdMap[k])
 			} else {
 				fn := strings.Replace(k, "-", "", -1)
 				ret += fmt.Sprintf("<a class='xhrlink' onclick='%s(); return false;' title='Play Job' href='%s'>[&rtrif;] %s [action %s]</a>\n",
@@ -750,12 +793,12 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 			if !httpAuthSession(w, r) {
 				return
 			}
-			
+
 			// TODO: If r.Query() map has ?param
 			// job is parameterized. Call func to parse out the job params
 			// from script (jobTag) and return a dynamic form page to
 			// edit params/launch.
-			
+
 			io.WriteString(w, `
 					<html>
 					<head>`+

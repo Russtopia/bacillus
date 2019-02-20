@@ -5,9 +5,9 @@
 #        c - choice (one-of), string
 #        b - boolean (true/false)
 #        
-# ?s?DELAY?5
-# ?c?SUITE?small|big|huge
-# ?b?DEBUG?false
+#-?s?DELAY?5
+#-?c?SUITE?small|big|huge
+#-?b?DEBUG?false
 #
 # all params are strings, so REST calls can encode as POST params
 # eg., ".../some_job/?DELAY=5&SUITE=big&DEBUG=true
