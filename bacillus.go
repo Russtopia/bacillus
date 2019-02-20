@@ -88,15 +88,22 @@ type RunningJobList map[string]string
 
 func xhrlinkCSSFrag() string {
 	return `<style>
-		span.xhrlink:hover {
-				text-decoration: underline;
-				background-color: aliceblue;
-				cursor: pointer;
+		a.xhrlink {
+			text-decoration: none;
+			color: inherit;
 		}
-		span.xhrlink:active {
-				background-color: lightgreen;
+		a.xhrlink:visited {
+			color: inherit;
 		}
-		</style>
+		a.xhrlink:hover {
+			text-decoration: underline;
+			background-color: aliceblue;
+			cursor: pointer;
+		}
+		a.xhrlink:active {
+			background-color: lightgreen;
+		}
+</style>
 		`
 }
 
@@ -332,6 +339,14 @@ func manualJobTriggersJS() (ret string) {
 	return
 }
 
+func isParameterizedBuildScript(scriptFName string) bool {
+	if scriptFName == "../artifact.sh" {
+		return true
+	} else {
+		return false
+	}
+}
+
 func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 	ret = "<pre style='background-color: skyblue;'>"
 	keys := make([]string, len(cmdMap))
@@ -342,12 +357,20 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 
 	for _, k := range keys {
 		if len(cmdMap[k]) > 0 {
-			//			ret += fmt.Sprintf("<a href='%s' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
-			//				k, k, cmdMap[k])
-			fn := strings.Replace(k, "-", "", -1)
-			//ret += fmt.Sprintf("<a href='' onclick='%s()' title='Play Job'>[&rtrif;]</a>%s [action %s]\n",
-			ret += fmt.Sprintf("<span class='xhrlink' onclick='%s()' title='Play Job'>[&rtrif;] %s [action %s]</span>\n",
-				/*k,*/ fn, k, cmdMap[k])
+			// ===================
+			// TODO: examine script at (k) for job-param syntax:
+			// If present, gen code to go to a params page dynamically
+			// constructed w/param form, rather than a direct XHR to
+			// launch endpoint
+			// ===================
+			if isParameterizedBuildScript(cmdMap[k]) {
+					ret += fmt.Sprintf("<a class='xhrlink' title='Play Job' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
+							k, k, cmdMap[k])
+			} else {
+				fn := strings.Replace(k, "-", "", -1)
+				ret += fmt.Sprintf("<a class='xhrlink' onclick='%s(); return false;' title='Play Job' href='%s'>[&rtrif;] %s [action %s]</a>\n",
+					fn, k, k, cmdMap[k])
+			}
 		}
 	}
 	if fullLogLink {
@@ -545,7 +568,7 @@ func execJob(j jobCtx) {
 	//fmt.Printf("%s %v\n", cmd, cmdStrList)
 	cmdCancelCtx, cmdCancelFunc := context.WithCancel(j.mainCtx)
 	defer cmdCancelFunc()
-	//var args string
+
 	var c *exec.Cmd
 	if len(cmdStrList) > 0 {
 		c = exec.CommandContext(cmdCancelCtx, cmd, strings.Join(cmdStrList, " "))
@@ -553,8 +576,6 @@ func execJob(j jobCtx) {
 		c = exec.CommandContext(cmdCancelCtx, cmd)
 	}
 
-	//var terr error
-	//var workDir string
 	var instColourIdx uint32
 	if indStyle == "colour" || indStyle == "both" {
 		instColourIdx = rand.Uint32() % uint32(len(instColours))
@@ -568,7 +589,6 @@ func execJob(j jobCtx) {
 	workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_%s_", j.jobOpts, j.jobTag))
 	c.Dir = workDir
 	jobID := strings.Split(workDir, "_")[3]
-	//fmt.Println("jobID:", jobID)
 	var indent int64
 	var indentStr string
 	if indStyle == "indent" || indStyle == "both" {
@@ -730,6 +750,12 @@ func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv [
 			if !httpAuthSession(w, r) {
 				return
 			}
+			
+			// TODO: If r.Query() map has ?param
+			// job is parameterized. Call func to parse out the job params
+			// from script (jobTag) and return a dynamic form page to
+			// edit params/launch.
+			
 			io.WriteString(w, `
 					<html>
 					<head>`+
