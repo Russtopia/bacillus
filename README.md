@@ -112,10 +112,12 @@ before launching the job. The basic syntax is
 Example
 
 ```
--?s?DELAY?5?Delay in seconds
--?c?SUITE?small|big|huge?Size of something
--?b?DEBUG?1?
+#-?s?DELAY?5?Delay in seconds
+#-?c?SUITE?small|big|huge?Size of something
+#-?b?DEBUG?1?
 ```
+
+Param lines such as the above should start at column 0 alone on a line, after the comment character on a new line in the script (acceptable prefixes currently are '#', '/*' and '//')
 
 A job containing the above would present a form with a text box, a dropdown list and a checkbox for each
 of the job parameters. Each variable is added to the job's environment variables.
