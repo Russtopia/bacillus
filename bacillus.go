@@ -161,13 +161,13 @@ func bodyBgndHTMLAttribs() string {
 
 // goBackJS() returns a JS fragment to make a page go back after a
 // short delay.
-func goBackJS(ms string) string {
+func goBackJS(pages, ms string) string {
 	return fmt.Sprintf(`
 <script>
   // Go back after a short delay
-  setInterval(function(){ window.location.href = document.referrer; }, %s);
+  setInterval(function(){ /*window.location.href = document.referrer;*/ window.history.go(-%s); }, %s);
 </script>
-`, ms)
+`, pages, ms)
 }
 
 func refreshJS(stat rune, intervalSecs string) string {
@@ -351,8 +351,6 @@ func isParameterizedBuildScript(scriptFName string) bool {
 	lines := strings.Split(string(fileBytes), "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "#-?") {
-			//TODO: just stub here to detect param builds
-			fmt.Println("script:", line)
 			isParamJob = true
 		} else if isParamJob {
 			break
@@ -363,12 +361,17 @@ func isParameterizedBuildScript(scriptFName string) bool {
 
 // Scan script for build parameter form specifiers.
 // returns false if there are none, otherwise true
-func genParameterizedBuildFormPage(scriptFName string) (ret string) {
+func genParameterizedBuildFormPage(jobTag, scriptFName string) (ret string) {
 	paramJobLine := false
-	// TODO: error empty page w/link to go back on malformed form error
-	ret = `<html><body>OMG WTF BBQ.</body></html>`
 
-	fileBytes, e := ioutil.ReadFile(jobHomeDir + strings.TrimPrefix(scriptFName, ".."))
+	ret = `
+<html>
+<head>
+</head>
+<body>
+`
+	scriptFName = strings.TrimPrefix(scriptFName, "../")
+	fileBytes, e := ioutil.ReadFile(jobHomeDir + "/" + scriptFName)
 	if e != nil {
 		fmt.Println("Error:", e)
 		return
@@ -379,15 +382,68 @@ func genParameterizedBuildFormPage(scriptFName string) (ret string) {
 		// HTML page w/form to set params and pass to job
 		// via a submit link
 		if strings.HasPrefix(line, "#-?") {
-			//TODO: just stub here to detect param builds
-			fmt.Println("script:", line)
+			if !paramJobLine {
+				// The hidden ?paramSet will trigger
+				// the final stage of same endpoint that
+				// calls this func (launchJob)
+				//
+				// TODO: form action="%s"
+				ret += `
+				<h2>` + jobTag + `</h2>
+				<h3>Build with Parameters </h3>
+				<hr />
+				<form action="/` + jobTag + `?paramSet" method="GET">
+				<input type="hidden" name="paramSet" />
+				`
+			}
 			paramJobLine = true
+
+			// Determine type of build param
+			// [0]:paramMarker (#-?) [1]:type (b|c|s) [2]:name [3]:(vals ...)
+			paramFields := strings.Split(line, "?")
+			switch paramFields[1] {
+			case "s":
+				ret += fmt.Sprintf("%s:<input type='text' name='%s' value='%s' /><br />\n",
+					paramFields[2], paramFields[2], paramFields[3])
+			case "c":
+				choices := strings.Split(paramFields[3], "|")
+				ret += paramFields[2] + ":<select name='" + paramFields[2] + "'>\n"
+				for _, c := range choices {
+					ret += "  <option value='" + c + "'>" + c + "</option>\n"
+				}
+				ret += "</select><br />\n"
+			case "b":
+				// NOTE the 'b' bool type uses HTML input type='checkbox'
+				// which sends nothing if unset. (eg., the job should
+				// expect a missing param and assume that means 'false',
+				// 'off', 'disabled' ...
+				//
+				// In bash syntax that would typically be handled like:
+				// option=${option:-"false"}
+
+				ret += paramFields[2]
+				ret += "  <input type='checkbox' name='" + paramFields[2] + "'"
+				if paramFields[3] == "on" ||
+					paramFields[3] == "true" ||
+					paramFields[3] == "1" ||
+					strings.HasPrefix(paramFields[3], "enable") {
+					ret += "value='true' checked"
+				} // else {
+				//	ret += "value='false'"
+				//}
+				ret += "/><br />"
+			}
 		} else if paramJobLine {
+			ret += `
+				<input type="submit" value="Build"/>
+				</form>
+</body>
+</html>
+`
 			break
 		}
 	}
-	ret = `<html><body>This should be a form for the job.</body></html>`
-	return
+	return ret
 }
 
 func manualJobTriggersHTML(fullLogLink bool) (ret string) {
@@ -401,7 +457,7 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 	for _, k := range keys {
 		if len(cmdMap[k]) > 0 {
 			// ===================
-			// TODO: examine script at (k) for job-param syntax:
+			// Examine script at (k) for job-param syntax:
 			// If present, gen code to go to a params page dynamically
 			// constructed w/param form, rather than a direct XHR to
 			// launch endpoint
@@ -771,7 +827,7 @@ func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
 					<html>
 					<head>`+
 		favIconHTML()+
-		goBackJS("3000")+`
+		goBackJS("1", "3000")+`
 					</head>
 					<body `+bodyBgndHTMLAttribs()+`>
 					`)
@@ -786,24 +842,60 @@ func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
 					</html>`)
 }
 
-func launchJobListener(mainCtx context.Context, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
+func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
+	origJobEnv := jobEnv
+	//TODO: parse all URL.Query() args and add to job's env?
+	// (thus the ?param endpoint could just clal this with GET-encoded
+	// params to set them here)
 	http.HandleFunc(fmt.Sprintf("/%s", jobTag),
 		func(w http.ResponseWriter, r *http.Request) {
+			jobEnv = origJobEnv // reset each time invoked, we append to it
+			pagesBack := "1" // 2 to return to top from parameterized builds
+
 			w.Header().Set("Content-type", "text/html")
 			if !httpAuthSession(w, r) {
 				return
 			}
 
-			// TODO: If r.Query() map has ?param
+			//fmt.Println(" :: ", r.URL.Query())
+			// Concept: user clicks on param job link
+			// -> ?param [user fills in values]
+			//   -> submit [same link but with ?paramSet&(formData ...)]
+			//   -> add ?paramSet ... to jobEnv
+			//   -> fall through to default execJob()
+
+			// TODO: If r.Query() map has ?param, gen page to let user
+			// define params.
 			// job is parameterized. Call func to parse out the job params
 			// from script (jobTag) and return a dynamic form page to
 			// edit params/launch.
+			_, ok := r.URL.Query()["param"]
+			if ok {
+				io.WriteString(w, genParameterizedBuildFormPage(jobTag, cmd))
+				return
+			}
+
+			// If we're called back with paramSet, which is submitted
+			// form data from dynamically-generated param form above,
+			// parse those values from r.URL.Query(), adding to jobEnv[].
+			_, ok = r.URL.Query()["paramSet"]
+			if ok {
+				pagesBack = "2" // since we insert a form page before launch
+				//fmt.Fprintf(w, "Form submitted to %v<br />\n", r.URL)
+				r.ParseForm()
+				for k, v := range r.Form {
+					if len(v) > 0 {
+						jobEnv = append(jobEnv, k+`="`+v[0]+`"`)
+					}
+				}
+				//fmt.Fprintf(w, "jobEnv w/params: %v<br />\n", jobEnv)
+			}
 
 			io.WriteString(w, `
 					<html>
 					<head>`+
 				favIconHTML()+
-				goBackJS("3000")+`
+				goBackJS(pagesBack, "3000")+`
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
@@ -905,7 +997,7 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 					<html>
 					<head>`+
 		favIconHTML()+
-		goBackJS("3000")+`
+		goBackJS("1", "3000")+`
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
@@ -923,7 +1015,7 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 					<html>
 					<head>`+
 		favIconHTML()+
-		goBackJS("3000")+`
+		goBackJS("1", "3000")+`
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
@@ -1091,7 +1183,7 @@ func main() {
 			// Note presently only 'blind' hooks are supported
 			// (ie., if webhook request contains POST JSON data,
 			// it isn't read).
-			launchJobListener(mainCtx, tag, jobOpts, jobEnv, cmdMap)
+			launchJobListener(mainCtx, cmd, tag, jobOpts, jobEnv, cmdMap)
 		}
 	}
 

@@ -7,7 +7,8 @@
 #        
 #-?s?DELAY?5
 #-?c?SUITE?small|big|huge
-#-?b?DEBUG?false
+#-?b?DEBUG?1
+#-?b?Detonator?disabled
 #
 # all params are strings, so REST calls can encode as POST params
 # eg., ".../some_job/?DELAY=5&SUITE=big&DEBUG=true
@@ -20,6 +21,8 @@ DEBUG=${DEBUG:-"false"}
 delay=${1:-"5"}
 
 echo "workdir: ${PWD}"
+env
+
 ADIR="${BACILLUS_ARTFDIR}"
 mkdir -p "${ADIR}"
 echo "blah" >"${ADIR}/artifact.txt"
