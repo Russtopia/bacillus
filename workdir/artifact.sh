@@ -5,9 +5,9 @@
 #        c - choice (one-of), string
 #        b - boolean (true/false)
 #        
-#-?s?DELAY?5
-#-?c?SUITE?small|big|huge
-#-?b?DEBUG?1
+#-?s?DELAY?5?(in seconds)
+#-?c?SUITE?small|big|huge?heap size
+#-?b?DEBUG?1?Keep debug symbols
 #-?b?Detonator?disabled
 #
 # all params are strings, so REST calls can encode as POST params
