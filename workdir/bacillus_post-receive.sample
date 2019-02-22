@@ -7,4 +7,5 @@ echo "** push hook"
 ## NOTE In my setup bacillus is behind a reverse proxy, 'bacillus.blitter.com'
 ## and therefore must be addressed via https://bacillus.blitter.com/
 ## though it runs http:// on port 9990.
-/usr/bin/curl -s https://bacillus.blitter.com/onPush-hkexsh-build >/dev/null 2>&1
+/usr/bin/curl -s https://bacillus.blitter.com/onPush-bacillus-build >/dev/null 2>&1
+
