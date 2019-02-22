@@ -865,9 +865,9 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			var pagesBack string
 			_, ok := r.URL.Query()["paramSet"]
 			if ok {
-					pagesBack = "2"
+				pagesBack = "2"
 			} else {
-					pagesBack = "1"
+				pagesBack = "1"
 			}
 
 			headerFragS := "<html><head>" + favIconHTML() + logoShortHdrHTML()
@@ -887,6 +887,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 
 			if shutdownModeActive {
 				bodyFragM = fmt.Sprintf("<pre>Server is in shutdown mode, come back later.</pre>\n")
+				bodyFragM += goBackJS(pagesBack, "3000")
 			} else if _, ok := r.URL.Query()["param"]; ok {
 				bodyFragM = genParameterizedBuildForm(jobTag, cmd)
 			} else if _, ok = r.URL.Query()["paramSet"]; ok {
