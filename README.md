@@ -98,6 +98,29 @@ If launched with the ```--auth``` option, bacill&mu;s gates access to all served
 
 For scripts and SCM hooks, to trigger an endpoint (job) via eg. ```wget``` or ```curl```, an initial login request must first be made to the bacill&mu;s server, which will reply with an HTTP basic auth challenge and the text ```Not logged in.```. Subsequent requests made with the proper username:password then can proceed. See bacillus_launch.sh for more information.
 
+## Parameterized Builds
+
+For jobs which may need user-settable parameters at each job invocation, parameters may be placed within
+comments in the main job file; these are picked up by the tool to generate a web form the user can fill out
+before launching the job. The basic syntax is
+
+-?T?VAR?DEFVALUE?COMMENT
+
+.. where T = [ s (string) | c (choice) | b (bool) ]
+  choices are separated by a pipe (|) character.
+  
+Example
+
+```
+#-?s?DELAY?5?Delay in seconds
+#-?c?SUITE?small|big|huge?Size of something
+#-?b?DEBUG?1?
+```
+
+Param lines such as the above should start at column 0 alone on a line, after the comment character on a new line in the script (acceptable prefixes currently are '#', '/*' and '//')
+
+A job containing the above would present a form with a text box, a dropdown list and a checkbox for each
+of the job parameters. Each variable is added to the job's environment variables.
 
 ## Example Run
 Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacill&mu;s itself)
