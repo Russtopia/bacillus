@@ -35,7 +35,7 @@ $ ./bacillus_launch.sh
 
 ## Configuration
 
-bacill&mu;s, being a simple tool, has little configuration. Almost all is encapsulated in the tool's invocation command-line, and in the worker scripts themselves. Individual job configuration can be controlled by defining environment variables passed to each job within the invocation endpoint syntax.
+bacill&mu;s, being a simple tool, has little configuration. Almost all is encapsulated in the tool's invocation command-line, and in the worker scripts themselves. Individual job configuration can be controlled by defining environment variables, either statically as passed to each job within the tool invocation via endpoint arguments, or dynamically, via job parameters encoded within each job script, which are parsed at job launch to present a form that the user can fill in prior to each run (parameterized jobs).
 
 ## Structure
 
@@ -78,7 +78,7 @@ Jobs launched by bacill&mu;s get some default environment variables, which shoul
 * **HOME** - home dir of user under which daemon runs
 * **BACILLUS_JOBID** - numerical ID which is the tempDir() suffix added to workdir/ and artifacts/ dir
 * **BACILLUS_JOBTAG** - the 'endpoint tag' specified in the launch arguments for the daemon binding a job to a run script
-* **BACILLUS_ARTFDIR** - the *relative* path from the job's launch workdir to the directory where it should, if required, store artifacts
+* **BACILLUS_ARTFDIR** - the *relative* path from the job's launch workdir to the directory where it should, if required, store artifacts (the job script it responsible for creating this dir before use)
 * **NOTE**: All other env vars normally defined for **$USER**, as if logged in via shell, are also given to jobs.
 
 A single run of a job will have workdir/ and artifacts/ dirs named ${BACILLUS_JOBTAG}_<jobOpts>_${BACILLUS_JOBID}.
@@ -136,11 +136,11 @@ $ ./bacillus_launch.sh
 [terminal B - client event test]
 
 ```
-$ curl -s http://localhost:9990/blind/onPush-hkexsh-build
+$ curl -s http://localhost:9990/onPush-hkexsh-build
 ```
 
 If ```--auth``` is used, the curl request will require credentials to activate the job endpoint, eg:
 
 ```
-$ curl -s --netrc-file auth.txt http://localhost:9990/onPush-bacillus-env
+$ curl -s --netrc-file auth.txt http://localhost:9990/onPush-bacillus-build
 ```
