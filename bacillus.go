@@ -861,7 +861,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			if !httpAuthSession(w, r) {
 				return
 			}
-			
+
 			var pagesBack string
 			_, ok := r.URL.Query()["paramSet"]
 			if ok {
@@ -869,7 +869,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			} else {
 					pagesBack = "1"
 			}
-			
+
 			headerFragS := "<html><head>" + favIconHTML() + logoShortHdrHTML()
 			headerFragM := goBackJS(pagesBack, "3000")
 			headerFragE := "</head>"
@@ -948,6 +948,7 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
 <span id='liveRunLog'>`+liveRunLogHTML(5)+`</span>
   LEGEND
   [&rtrif;] Start a job manually
+  [&rtri;] Start a job with parameters
   [&cross;] Cancel a running job
   [&ccupssm;] View completed job artifacts
   [&ccups;] View partial artifacts for a failed job
