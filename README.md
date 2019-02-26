@@ -144,3 +144,5 @@ If ```--auth``` is used, the curl request will require credentials to activate t
 ```
 $ curl -s --netrc-file auth.txt http://localhost:9990/onPush-bacillus-build
 ```
+
+Likewise, a web browser will present a user/pass authorization popup before allowing access to the web interface.
