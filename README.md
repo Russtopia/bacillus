@@ -6,13 +6,13 @@ bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L
 
 ## Rationale
 
-The goal of this project is to offer an *extremely* minimal Build Automation and Continuous Integration (CI) system with zero dependencies on large frameworks, VMs or containers. Its core features reflect those the author found essential while using, administering and customizing a more traditional, shall we say, 'butler-based' build automation system for a large dev team over multiple years; experience showed that a lot of 'the other stuff' was completely unnecessary, or better achieved by external tools.
+The goal of this project is to offer an *extremely* minimal Build Automation and Continuous Integration (CI) system with zero dependencies on large frameworks, VMs or containers. Its core features reflect those the author found essential while using, administering and customizing a more traditional, shall we say, 'butler-based' build automation system for a large dev team over multiple years, experience showing that most of 'the other stuff' was completely unnecessary and better achieved by utilizing common external tools.
 
-bacill&mu;s is a single static binary with almost zero external configuration. With little to configure, one can be up and running within minutes. No containers, VMs, or DSLs (Domain-Specific Languages).
+bacill&mu;s is a single static binary with almost zero external configuration. With little to configure, one can be up and running within minutes -- no containers, VMs, or DSLs (Domain-Specific Languages).
 
 It basically should run on a potato, if that potato runs Go, without breaking a sweat.
 
-bacill&mu;s is language-agnostic. Any script or binary that can be launched from a Linux shell can also be launched by bacill&mu;s. Job-specific behaviour can (must!) be implemented in whatever language(s) with which the integrator is already fluent, avoiding the learning curve of other build automation tools.
+bacill&mu;s is language-agnostic. Any script or binary that can be launched from a shell can also be launched by bacill&mu;s. Job-specific behaviour can (must!) be implemented in whatever language(s) with which the integrator is already fluent, avoiding the learning curve of other build automation tools.
 
 If you want a point-and-click build server that lets you make jobs without knowing what a shell or cron scheduler is, this probably isn't for you. But if you want a build server that serves as a launch point, has a minimal but useful web interface, and otherwise *stays out of your way*, read on.
 
@@ -35,7 +35,7 @@ $ ./bacillus_launch.sh
 
 ## Configuration
 
-bacill&mu;s, being a simple tool, has little configuration. Almost all is encapsulated in the tool's invocation command-line, and in the worker scripts themselves. Individual job configuration can be controlled by defining environment variables, either statically as passed to each job within the tool invocation via endpoint arguments, or dynamically, via job parameters encoded within each job script, which are parsed at job launch to present a form that the user can fill in prior to each run (parameterized jobs).
+bacill&mu;s, being a simple tool, has little configuration. Almost all is encapsulated in the tool's invocation command-line and in the worker scripts themselves. Individual job configuration can be controlled by defining environment variables, either statically as passed to each job within the tool invocation via endpoint arguments, or dynamically, via job parameters encoded within each job script, which are parsed at job launch to present a form that the user can fill in prior to each run (parameterized jobs).
 
 ## Structure
 
@@ -72,16 +72,16 @@ In summary, to perform build/CI tasks with bacill&mu;s, one should
 
 ## Job Environment
 
-Jobs launched by bacill&mu;s get some default environment variables, which should be sufficient to bootstrap typical jobs:
+Jobs launched by bacill&mu;s get some default environment variables, which should be sufficient to bootstrap typical tasks:
 
 * **USER** - user under which daemon runs
 * **HOME** - home dir of user under which daemon runs
 * **BACILLUS_JOBID** - numerical ID which is the tempDir() suffix added to workdir/ and artifacts/ dir
 * **BACILLUS_JOBTAG** - the 'endpoint tag' specified in the launch arguments for the daemon binding a job to a run script
-* **BACILLUS_ARTFDIR** - the *relative* path from the job's launch workdir to the directory where it should, if required, store artifacts (the job script it responsible for creating this dir before use)
+* **BACILLUS_ARTFDIR** - the *relative* path from the job's launch workdir to the directory where it should, if required, store artifacts (the job script is responsible for creating this dir before use)
 * **NOTE**: All other env vars normally defined for **$USER**, as if logged in via shell, are also given to jobs.
 
-A single run of a job will have workdir/ and artifacts/ dirs named ${BACILLUS_JOBTAG}_<jobOpts>_${BACILLUS_JOBID}.
+A single run of a job will have workdir/ and artifacts/ dirs named ```bacillus_<jobOpts>_${BACILLUS_JOBTAG}_${BACILLUS_JOBID}```.
 
 ## Scheduling, Storage and Artifact Management
 
