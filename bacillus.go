@@ -170,12 +170,24 @@ func goBackJS(pages, ms string) string {
 `, pages, ms)
 }
 
-func refreshJS(stat rune, intervalSecs string) string {
+func refreshMetaTag(stat rune, intervalSecs string) string {
 	if stat == 'r' {
 		return `<meta http-equiv="refresh" content="` + intervalSecs + `">`
 	} else {
 		return ``
 	}
+}
+
+// forceReloadOnHistJS() emits a JS fragment suitable for inclusion into
+// HTML page <head>ers that forces a page refresh if the page is visited
+// via the browser history or back button.
+func forceReloadOnHistJS() string {
+	return `<script>
+  if(performance.navigation.type == 2) {
+    location.reload(true);
+  }
+  </script>
+  `
 }
 
 func consActiveSpinnerCSS() string {
@@ -626,7 +638,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 <head>
 `+
 		favIconHTML()+
-		refreshJS(stat, "5")+
+		refreshMetaTag(stat, "5")+
 		compatJS()+
 		consActiveSpinnerCSS()+
 		consActiveSpinnerJS(stat, codeColor, statWord)+
@@ -931,7 +943,8 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <html>
 <head>`+
 		favIconHTML()+
-		/*refreshJS('r', "10")+*/
+		forceReloadOnHistJS()+
+		/*refreshMetaTag('r', "10")+*/
 		xmlHTTPRequester("xhrLiveRunLogUpdate", "/api/lru?tl=5", `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
 		xmlHTTPRequester("xhrRunningJobsCount", "/api/rjc", `document.getElementById('liveRunLogCount').innerHTML = xhttp.response;`)+
 		xhrlinkCSSFrag()+`
