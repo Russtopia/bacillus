@@ -195,41 +195,41 @@ func consActiveSpinnerCSS() string {
   <style>
     #spinner {
       position: fixed;
-      right: 1em; bottom: 1.5em;
+      right: 0.5em; bottom: 1em;
       font-family: monospace;
-      margin: 1em;
+      margin: 0.5em;
       padding: 0.2em;
       font-size: 1.5em;
       font-weight: normal; //bold;
       background: skyblue;
       border: dotted 2px;
-      border-radius: 1em;
+      border-radius: 0.5em;
     }
 	
     #finOKMarker {
       position: fixed;
-      right: 1em; bottom: 1.5em;
+      right: 0.5em; bottom: 1em;
       font-family: monospace;
-      margin: 1em;
+      margin: 0.5em;
       padding: 0.2em;
       font-size: 1.5em;
       font-weight: normal;
       background: lightgreen;
       border: dotted 2px;
-      border-radius: 1em;
+      border-radius: 0.5em;
     }
 	
     #finErrMarker {
       position: fixed;
-      right: 1em; bottom: 1.5em;
+      right: 0.5em; bottom: 1em;
       font-family: monospace;
-      margin: 1em;
+      margin: 0.5em;
       padding: 0.2em;
       font-size: 1.5em;
       font-weight: bold;
       background: red;
       border: dotted 2px;
-      border-radius: 1em;
+      border-radius: 0.5em;
     }
 	
     //#stat {
@@ -653,12 +653,12 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 <body>
 `)
 
+	io.WriteString(w, logoShortHdrHTML())
 	io.WriteString(w, "<pre>")
 	w.Write(consoleLog)
-	io.WriteString(w, "</pre>")
-	io.WriteString(w, "<pre>\n\n\n</pre>")
+	io.WriteString(w, "\n</pre>")
 
-	w.Write([]byte(fmt.Sprintln(r.URL)))
+	io.WriteString(w, "<pre>"+ fmt.Sprintln(r.URL) + "</pre>")
 	io.WriteString(w, `
 </body>
 </html>
