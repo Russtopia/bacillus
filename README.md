@@ -6,13 +6,13 @@ bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L
 
 ## Rationale
 
-The goal of this project is to offer an *extremely* minimal Build Automation and Continuous Integration (CI) system with zero dependencies on large frameworks, VMs or containers. Its core features reflect those the author found essential while using, administering and customizing a more traditional, shall we say, 'butler-based' build automation system for a large dev team over multiple years, experience showing that most of 'the other stuff' was completely unnecessary and better achieved by utilizing common external tools.
-
-bacill&mu;s is a single static binary with almost zero external configuration. With little to configure, one can be up and running within minutes -- no containers, VMs, or DSLs (Domain-Specific Languages).
-
-It basically should run on a potato, if that potato runs Go, without breaking a sweat.
+The goal of this project is to offer an *extremely* minimal Build Automation and Continuous Integration (CI) system with zero dependencies on large frameworks, VMs or containers. It basically should run on a potato, if that potato can run binaries compiled with Go, without breaking a sweat.
 
 bacill&mu;s is language-agnostic. Any script or binary that can be launched from a shell can also be launched by bacill&mu;s. Job-specific behaviour can (must!) be implemented in whatever language(s) with which the integrator is already fluent, avoiding the learning curve of other build automation tools.
+
+Core features reflect those the author found essential while using, administering and customizing a more traditional 'butler-based' build automation system for a large dev team over multiple years: experience showed that most of the 'other stuff' was unnecessary and better achieved by utilizing common external tools.
+
+bacill&mu;s is a single static binary with nearly zero external configuration. With little to configure, one can be up and running within minutes -- no containers, VMs, or DSLs (Domain-Specific Languages).
 
 If you want a point-and-click build server that lets you make jobs without knowing what a shell or cron scheduler is, this probably isn't for you. But if you want a build server that serves as a launch point, has a minimal but useful web interface, and otherwise *stays out of your way*, read on.
 
