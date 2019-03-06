@@ -148,7 +148,7 @@ $ curl -s http://localhost:9990/onPush-hkexsh-build
 If ```--auth``` is used, the curl request will require credentials to activate the job endpoint, eg:
 
 ```
-$ curl -s --netrc-file auth.txt http://localhost:9990/onPush-bacillus-build
+$ curl -s --netrc-file hooks/auth.txt http://localhost:9990/onPush-bacillus-build
 ```
 
 Likewise, a web browser will present a user/pass authorization popup before allowing access to the web interface.
@@ -165,3 +165,4 @@ Likewise, a web browser will present a user/pass authorization popup before allo
        Text      2     2        0      0      2     0.1%
      Modula      1     1        0      0      1     0.1%
 ```
+
