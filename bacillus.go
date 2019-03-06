@@ -137,7 +137,7 @@ func xhrRunningJobsCountHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
-	tl := 4
+	tl := 6
 	v, ok := r.URL.Query()["tl"]
 	if ok {
 		fmt.Sscanf(v[0], "%d", &tl)
@@ -484,7 +484,7 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 			// launch endpoint
 			// ===================
 			if isParameterizedBuildScript(cmdMap[k]) {
-				ret += fmt.Sprintf("<a class='xhrlink' title='Play Job' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
+				ret += fmt.Sprintf("<a class='xhrlink' title='Play Job with Parameters' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
 					k, k, cmdMap[k])
 			} else {
 				fn := strings.Replace(k, "-", "", -1)
@@ -951,7 +951,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 		favIconHTML()+
 		forceReloadOnHistJS()+
 		/*refreshMetaTag('r', "10")+*/
-		xmlHTTPRequester("xhrLiveRunLogUpdate", "/api/lru?tl=5", `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		xmlHTTPRequester("xhrLiveRunLogUpdate", "/api/lru?tl=6", `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
 		xmlHTTPRequester("xhrRunningJobsCount", "/api/rjc", `document.getElementById('liveRunLogCount').innerHTML = xhttp.response;`)+
 		xhrlinkCSSFrag()+`
 </head>
@@ -965,7 +965,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   
 Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span>)
 ...
-<span id='liveRunLog'>`+liveRunLogHTML(5)+`</span>
+<span id='liveRunLog'>`+liveRunLogHTML(6)+`</span>
   LEGEND
   [&rtrif;] Start a job manually
   [&rtri;] Start a job with parameters
@@ -977,7 +977,6 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
   <span style='background-color:red'>[!]</span> Job completed with nonzero status - click to view
 
   .. that's about it.
-     Happy Build Automating, DevOps-ing, or whatever it's called these days...
 	 
   Oh, and in case you need to...
   <a href='/shutdown'>prevent any new jobs for a graceful shutdown</a>   (afterwards, use <strong>/rudeshutdown</strong>)
