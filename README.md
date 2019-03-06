@@ -151,3 +151,16 @@ $ curl -s --netrc-file auth.txt http://localhost:9990/onPush-bacillus-build
 ```
 
 Likewise, a web browser will present a user/pass authorization popup before allowing access to the web interface.
+
+
+## Code Size
+```
+  Languages  Files  Code  Comment  Blank  Total  CodeLns
+      Total     14  1027      704    222   1953   100.0%
+         Go      2   741      607    109   1457    74.6%
+   Markdown      3   140        0     68    208    10.7%
+      Shell      5   100       97     40    237    12.1%
+       YAML      1    43        0      5     48     2.5%
+       Text      2     2        0      0      2     0.1%
+     Modula      1     1        0      0      1     0.1%
+```
