@@ -122,6 +122,11 @@ Param lines such as the above should start at column 0 alone on a line, after th
 A job containing the above would present a form with a text box, a dropdown list and a checkbox for each
 of the job parameters. Each variable is added to the job's environment variables.
 
+## Job Pipeline Views
+
+There is support for a simple 'pipeline view' of the stages of running jobs. See
+the 'stage' function in examples ```workdir/hkexsh_pushbuild.sh``` and ```workdir/bacillus-pushbuild.sh```. Stages up to and including the running stage will be displayed at the end of the running job's entry in the runlog view.
+
 ## Example Run
 Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacill&mu;s itself)
 
