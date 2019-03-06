@@ -77,7 +77,12 @@ var (
 		"goldenrod"}
 )
 
-type RunningJobList map[string]string
+type runningJobInfo struct {
+	jobTag  string
+	workDir string
+}
+
+type RunningJobList map[string]runningJobInfo
 
 // There is a smattering of HTML and JS in this project, programmatically
 // generated.
@@ -658,7 +663,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(consoleLog)
 	io.WriteString(w, "\n</pre>")
 
-	io.WriteString(w, "<pre>"+ fmt.Sprintln(r.URL) + "</pre>")
+	io.WriteString(w, "<pre>"+fmt.Sprintln(r.URL)+"</pre>")
 	io.WriteString(w, `
 </body>
 </html>
@@ -766,10 +771,11 @@ func execJob(j jobCtx) {
 				j.jobTag)
 		} else {
 			//runningJobCount += 1
-			runningJobs[jobID] = j.jobTag
+			runningJobs[jobID] = runningJobInfo{j.jobTag, workDir}
+
 			jobCancellers[jobID] = cmdCancelFunc
 			j.w.Write([]byte("OK"))
-			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]</span>\n",
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]<!--:STAGE:--></span>\n",
 				jobID, instColour,
 				workerOutputRelPath,
 				indentStr,
@@ -816,7 +822,7 @@ func execJob(j jobCtx) {
 				j.jobTag, jobID,
 				j.jobOpts, j.jobTag, jobID)
 		} else {
-			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]</span><!--COMPLETION-->\n",
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]<!--:STAGE:--></span><!--COMPLETION-->\n",
 				jobID, instColour,
 				workerOutputRelPath,
 				indentStr,
@@ -966,7 +972,7 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
   [&cross;] Cancel a running job
   [&ccupssm;] View completed job artifacts
   [&ccups;] View partial artifacts for a failed job
-  [&acd;] Job is running - click to view
+  [<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>] Job is running - click to view
   [&check;] Job completed with OK(0) status - click to view
   <span style='background-color:red'>[!]</span> Job completed with nonzero status - click to view
 
@@ -1113,6 +1119,27 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 						}
 					}
 				}
+			} else if strings.Contains(fixed[idx], "<!--:STAGE:-->") &&
+				strings.Contains(fixed[idx], "[&acd;]") {
+				fixed[idx] = strings.Replace(fixed[idx], "&acd;", "<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>", 1)
+				// Found an entry for a running job;
+				// fetch the stage, if defined, and add it to the
+				// live line's view.
+				var jidStart, jidEnd int
+				var jobID string
+				jidStart = strings.Index(fixed[idx], "<!--JOBID:")
+				if jidStart != -1 {
+					jidStart += len("<!--JOBID:")
+					jidEnd = strings.Index(fixed[idx], ":JOBID-->")
+				}
+				if jidStart != -1 && jidEnd != -1 {
+					jobID = fixed[idx][jidStart:jidEnd]
+				}
+				currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
+				if e == nil {
+					//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
+					fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " [" + strings.TrimSpace(string(currentStage)) + "]", 1)
+				}
 			}
 		}
 	}
@@ -1137,7 +1164,7 @@ func main() {
 	mainCtx := context.Background()
 
 	cmdMap = make(map[string]string)
-	runningJobs = make(map[string]string)
+	runningJobs = make(map[string]runningJobInfo)
 	jobCancellers = make(map[string]func())
 
 	var logfile *os.File
