@@ -8,6 +8,19 @@ export GOPATH="${HOME}/go"
 # GOCACHE will be phased out in v1.12. [github.com/golang/go/issues/26809]
 export GOCACHE="${HOME}/.cache/go-build"
 
+function stage {
+  local _stage="${BACILLUS_WORKDIR}"/_stage
+  
+  if [ ! -f ${_stage} ]; then
+    echo -n "$1" >"${BACILLUS_WORKDIR}"/_stage
+  else
+    echo -n ":$1" >>"${BACILLUS_WORKDIR}"/_stage
+  fi
+}
+
+
+stage "Setup"
+
 echo "---"
 go env
 echo "---"
@@ -15,15 +28,23 @@ echo "passed env:"
 env
 echo "---"
 
-#cd ${BACILLUS_WORKDIR}
+stage "Clean Workspace"
+
 echo "curDir: $PWD"
 rm -rf build
+
+stage "Clone"
+
 mkdir -p build
 cd build
 git clone https://gogs.blitter.com/Russtopia/bacillus
 cd bacillus
 
+stage "Build"
+
 go build .
+
+stage "Artifacts"
 
 tar czvf ${BACILLUS_ARTFDIR}/bacillus.tgz .
 echo "--Done--"
