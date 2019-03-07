@@ -42,6 +42,7 @@ if [ ! -f $HOME/go/bin/grml ]; then
   if [ ! -f $GOPATH/bin/grml ]; then
     echo "ERROR installing grml build tool."
     exit 1
+  fi
 fi
 
 stage "Clone"
