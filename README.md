@@ -71,6 +71,9 @@ In summary, to perform build/CI tasks with bacill&mu;s, one should
 * define endpoints, jobOpts and jobEnv config for each to pass
   to bacill&mu;s (see bacillus_launch.sh)
 
+Visual matching of job trigger and completion entries in the runlog can be indicated in various ways, controlled by the -i switch.
+Valid values are ```[ none | indent | colour | both ]```.
+
 ## Job Environment
 
 Jobs launched by bacill&mu;s get some default environment variables, which should be sufficient to bootstrap typical tasks:
