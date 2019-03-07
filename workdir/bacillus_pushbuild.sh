@@ -5,6 +5,8 @@ mkdir -p "${BACILLUS_ARTFDIR}"
 
 export GO111MODULE=auto
 export GOPATH="${HOME}/go"
+export PATH=$PATH:$GOPATH/bin
+
 # GOCACHE will be phased out in v1.12. [github.com/golang/go/issues/26809]
 export GOCACHE="${HOME}/.cache/go-build"
 
@@ -32,6 +34,12 @@ stage "Clean Workspace"
 
 echo "curDir: $PWD"
 rm -rf build
+
+if [ ! -f $HOME/go/bin/grml ]; then
+  stage "Tools"
+  echo "Installing grml ..."
+  go get github.com/desertbit/grml
+fi
 
 stage "Clone"
 
