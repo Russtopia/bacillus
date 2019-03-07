@@ -1138,7 +1138,7 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 				currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
 				if e == nil {
 					//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
-					fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " [" + strings.TrimSpace(string(currentStage)) + "]", 1)
+					fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " ["+strings.TrimSpace(string(currentStage))+"]", 1)
 				}
 			}
 		}

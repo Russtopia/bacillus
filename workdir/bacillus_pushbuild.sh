@@ -40,9 +40,11 @@ cd build
 git clone https://gogs.blitter.com/Russtopia/bacillus
 cd bacillus
 
-stage "Build"
+stage "Tests"
+grml tests
 
-go build .
+stage "Build"
+grml app
 
 stage "Artifacts"
 

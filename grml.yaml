@@ -21,6 +21,11 @@ commands:
     exec: |
       echo "TODO: cp binary and docs to ${releaseDir}"
 
+  tests:
+    help: unit tests.
+    exec:
+      go test -v .
+
   install:
     help: install binaries
     deps:
@@ -41,6 +46,8 @@ commands:
   app:
     aliases: [ build ]
     help: build the bacillus tool
+    deps:
+      - tests
     exec: |
       go clean .
       gofmt -w .
