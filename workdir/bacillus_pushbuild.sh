@@ -39,6 +39,9 @@ if [ ! -f $HOME/go/bin/grml ]; then
   stage "Tools"
   echo "Installing grml ..."
   go get github.com/desertbit/grml
+  if [ ! -f $GOPATH/bin/grml ]; then
+    echo "ERROR installing grml build tool."
+    exit 1
 fi
 
 stage "Clone"
