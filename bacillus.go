@@ -966,6 +966,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span>)
 ...
 <span id='liveRunLog'>`+liveRunLogHTML(6)+`</span>
+
   LEGEND
   [&rtrif;] Start a job manually
   [&rtri;] Start a job with parameters
