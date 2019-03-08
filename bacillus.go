@@ -1040,6 +1040,32 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 					</html>`)
 }
 
+func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
+	if !httpAuthSession(w, r) {
+		return
+	}
+
+	io.WriteString(w, `
+<html>
+<head>`+
+		favIconHTML()+
+		xhrlinkCSSFrag()+
+		xmlHTTPRequester("xhrLiveRunLogUpdate", fmt.Sprintf("/api/lru?tl=%d", runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		logoShortHdrHTML()+`
+</head>
+<body `+bodyBgndHTMLAttribs()+`>`)
+	io.WriteString(w, `<p><img src="images/BenderCI.jpg" /></p>`)
+	io.WriteString(w, goBackJS("1", "5000"))
+	io.WriteString(w, `<pre>
+  bacill&mu;s CI server. Written in <a href="https://golang.org/">Go</a>
+  &copy; Copyright 2019 by Russ Magee. All Rights Reserved.
+</pre>
+</body>
+</html>
+    `)
+
+}
+
 func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
 	w.Header().Set("Content-type", "text/html")
@@ -1264,6 +1290,9 @@ func main() {
 
 	// Rude exit (regardless of running jobs)
 	http.HandleFunc("/rudeshutdown", rudeShutdownHandler)
+
+	// About page
+	http.HandleFunc("/about", aboutPageHandler)
 
 	// Endpoint for XHR live run log updates
 	http.HandleFunc("/api/lru", xhrLiveRunLogHandler)
