@@ -32,6 +32,7 @@ import (
 	"strings"
 )
 
+// FileServer represents a served filesystem
 type FileServer struct {
 	Root string
 	http.Handler

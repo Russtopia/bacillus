@@ -28,6 +28,10 @@ const (
 	appVer         string = "v0.1"
 	httpAuthUser          = "bacuser"
 	httpAuthPasswd        = "gramnegative" //b64:"YmFjdXNlcjpncmFtbmVnYXRpdmU="
+	//indStyleNone          = "none"
+	indStyleIndent = "indent"
+	indStyleBoth   = "both"
+	indStyleColour = "colour"
 )
 
 var (
@@ -36,7 +40,6 @@ var (
 	basicAuth          bool   // basic http auth
 	strUser            string // API user
 	strPasswd          string // API passwd
-	apiKey             string
 	attachStdout       bool
 	shutdownModeActive bool
 	killSwitch         chan bool
@@ -45,7 +48,7 @@ var (
 	instCounter uint32
 	//runningJobCount uint
 	cmdMap          map[string]string
-	runningJobs     RunningJobList //map[string]string
+	runningJobs     runningJobList //map[string]string
 	jobHomeDir      string
 	artifactBaseDir string
 	runLogTailLines int
@@ -82,7 +85,7 @@ type runningJobInfo struct {
 	workDir string
 }
 
-type RunningJobList map[string]runningJobInfo
+type runningJobList map[string]runningJobInfo
 
 // There is a smattering of HTML and JS in this project, programmatically
 // generated.
@@ -133,7 +136,7 @@ func xmlHTTPRequester(jsFuncName string, uri string, respHandlerJS string) strin
 }
 
 func xhrRunningJobsCountHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, fmt.Sprintf("%d", len(runningJobs)))
+	_, _ = io.WriteString(w, fmt.Sprintf("%d", len(runningJobs)))
 }
 
 func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
@@ -178,9 +181,8 @@ func goBackJS(pages, ms string) string {
 func refreshMetaTag(stat rune, intervalSecs string) string {
 	if stat == 'r' {
 		return `<meta http-equiv="refresh" content="` + intervalSecs + `">`
-	} else {
-		return ``
 	}
+	return ``
 }
 
 // forceReloadOnHistJS() emits a JS fragment suitable for inclusion into
@@ -271,8 +273,8 @@ appendSpinner = function() {
 }
 ////////////////////////
 </script>`
-	} else {
-		return `<script>
+	}
+	return `<script>
 		////////////////////////
 appendSpinner = function() {
   var el = document.createElement('div');
@@ -282,7 +284,6 @@ appendSpinner = function() {
 }
 ////////////////////////
 </script>`
-	}
 }
 
 func compatJS() string {
@@ -510,11 +511,11 @@ func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 	u, p, ok := r.BasicAuth()
 	if ok && u == strUser && p == strPasswd {
 		return true
-	} else {
-		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Not logged in.")
 	}
+
+	w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
+	w.WriteHeader(http.StatusUnauthorized)
+	io.WriteString(w, "Not logged in.")
 	return
 }
 
@@ -617,7 +618,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 
 	var stat rune
 	var code int
-	n, e := fmt.Sscanf(consStat, "[%c %03d]", &stat, &code)
+	n, _ := fmt.Sscanf(consStat, "[%c %03d]", &stat, &code)
 	_ = n
 	if l > 0 {
 		tail = lines[len(lines)-tailL:]
@@ -696,9 +697,9 @@ func execJob(j jobCtx) {
 	}
 
 	var instColourIdx uint32
-	if indStyle == "colour" || indStyle == "both" {
+	if indStyle == indStyleColour || indStyle == indStyleBoth {
 		instColourIdx = rand.Uint32() % uint32(len(instColours))
-		instCounter += 1
+		instCounter++
 	} else {
 		instColourIdx = 0
 	}
@@ -710,7 +711,7 @@ func execJob(j jobCtx) {
 	jobID := strings.Split(workDir, "_")[3]
 	var indent int64
 	var indentStr string
-	if indStyle == "indent" || indStyle == "both" {
+	if indStyle == indStyleIndent || indStyle == indStyleBoth {
 		indent, _ = strconv.ParseInt(jobID, 10, 64)
 		indentStr = strings.Repeat("-", int(indent%8)+4)
 	}
@@ -754,13 +755,9 @@ func execJob(j jobCtx) {
 		// by the top "/" endpoint to show recently active jobs (ie., those with
 		// workdirs still present)
 		//
-		_, err := fmt.Fprintf(c.Stdout, "[r 255]\n")
-		_, err = fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
-		_, err = fmt.Fprintf(c.Stdout, "%s\n", j.jobTag)
-
-		if err != nil {
-			log.Fatal(err)
-		}
+		fmt.Fprintf(c.Stdout, "[r 255]\n")
+		fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
+		fmt.Fprintf(c.Stdout, "%s\n", j.jobTag)
 
 		cerr := c.Start()
 		if cerr != nil {
@@ -1054,8 +1051,8 @@ func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
 		logoShortHdrHTML()+`
 </head>
 <body `+bodyBgndHTMLAttribs()+`>`)
-	io.WriteString(w, `<p><img src="images/BenderCI.jpg" /></p>`)
-	io.WriteString(w, goBackJS("1", "5000"))
+	io.WriteString(w, `<p><img src="images/BenderCI.jpg" width="600px"/></p>`)
+	io.WriteString(w, goBackJS("1", "10000"))
 	io.WriteString(w, `<pre>
   bacill&mu;s CI server. Written in <a href="https://golang.org/">Go</a>
   &copy; Copyright 2019 by Russ Magee. All Rights Reserved.
@@ -1135,7 +1132,7 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 						if strings.Contains(fixed[seekIdx], jobTag) {
 							fixed[seekIdx] = strings.Replace(fixed[seekIdx],
 								"display:inline", "display:none", -1)
-							if indStyle == "both" || indStyle == "indent" {
+							if indStyle == indStyleBoth || indStyle == indStyleIndent {
 								fixed[seekIdx] = strings.Replace(fixed[seekIdx],
 									"---", "------", 1)
 							} else if indStyle == "colour" {
@@ -1182,7 +1179,7 @@ func main() {
 	flag.StringVar(&strUser, "u", httpAuthUser, "web UI and endpoint username")
 	flag.StringVar(&strPasswd, "p", httpAuthPasswd, "web UI and endpoint password")
 	flag.BoolVar(&createRunlog, "c", false, "set true/1 to create new run.log, overwriting old one")
-	flag.StringVar(&indStyle, "i", "both", "job entry indicator style [none|indent|colour|both]")
+	flag.StringVar(&indStyle, "i", indStyleBoth, "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.Parse()
