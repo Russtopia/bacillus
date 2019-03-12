@@ -1,4 +1,12 @@
 // bacillus - a A minimalist Build Automation/CI service
+//
+// bacillμs (Build Automation/Continuous Integration Low-Linecount μ(micro)-Service)
+// listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests.
+// Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc.
+// or from wget or curl requests made from git commit hooks.
+//
+// It is intended as a no-dependency, no-nonsense build automation system
+// with minimal constraints so you may extend with whatever CI/CD/Devops process you want.
 package main
 
 import (
@@ -358,7 +366,7 @@ func liveRunLogHTML(tl int) (ret string) {
 	// Scan backwards in log for completion msgs, match with
 	// preceding launch msgs to un-mark the in-progress and cancel icons there
 	// (only 'live' view)
-	tailLines = patchCompletedJobsInLog(tailLines, tl)
+	tailLines = patchLiveViewOfRunLogEntries(tailLines, tl)
 
 	if tl == 0 || tailCount < tl {
 		ret += strings.Join(tailLines, "\n")
@@ -433,6 +441,8 @@ func isParameterizedBuildScript(scriptFName string) bool {
 // genParameterizedBuildForm scans job script scriptFName for build parameter
 // form specifiers, returning an HTML fragment suitable for setting all
 // defined parameters.
+//
+// nolint:gocyclo
 func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 	paramJobLine := false
 
@@ -741,6 +751,11 @@ type jobCtx struct {
 	jobEnv  []string
 }
 
+// execJob spawns the actual job, waiting for it to complete and
+// marks the runlog entry to indicate completion status and supply
+// the artifact link.
+//
+//nolint:gocyclo
 func execJob(j jobCtx) {
 	// Some wrinkles in the exec.Command API: If there are no args,
 	// one must completely omit the args ... to avoid strange errors
@@ -1170,7 +1185,83 @@ func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	killSwitch <- true
 }
 
-func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
+// patchLiveRunEntries looks at a limited back-history of runlog entries
+// and updates ones representing currently-running jobs with live status.
+//
+// HTML comment blocks inside elements, <!--JOBID:>...<:JOBID--> and <!--:STAGE:-->
+// are used to find elements to patch with live run status info.
+// Recently-completed jobs also have their in-progress symbol at the start
+// replaced if the placeholder comment <!--COMPLETION--> is found in a
+// later log entry.
+//
+//nolint:gocyclo
+func patchLiveRunEntries(idx, horizon int, fixed []string) []string {
+	if strings.Count(fixed[idx], "<!--COMPLETION-->") != 0 {
+		// Found a completed job. Seek a few entries back
+		// to mark the job launch stmt, hiding the in-progress
+		// and cancel links within.
+		var jidStart, jidEnd int
+		var jobID string
+		jidStart = strings.Index(fixed[idx], "<!--JOBID:")
+		if jidStart != -1 {
+			jidStart += len("<!--JOBID:")
+			jidEnd = strings.Index(fixed[idx], ":JOBID-->")
+		}
+		if jidStart != -1 && jidEnd != -1 {
+			jobID = fixed[idx][jidStart:jidEnd]
+			jobTag := "<!--JOBID:" + jobID + ":JOBID-->"
+			for seekIdx := idx - 1; seekIdx >= 0 && seekIdx > horizon; seekIdx-- {
+				// NOTE we're modifying the 'live' view of
+				// the logfile, not the direct data on disk, so
+				// no need to replace byte-for-byte.
+				// (If this func is optimized to be zero-copy
+				//  however, it might need to be.)
+				if strings.Contains(fixed[seekIdx], jobTag) {
+					fixed[seekIdx] = strings.Replace(fixed[seekIdx],
+						"display:inline", "display:none", -1)
+					if indStyle == indStyleBoth || indStyle == indStyleIndent {
+						fixed[seekIdx] = strings.Replace(fixed[seekIdx],
+							"---", "------", 1)
+					} else if indStyle == "colour" {
+						fixed[seekIdx] = strings.Replace(fixed[seekIdx],
+							"[job", "   [job", 1)
+					}
+				}
+			}
+		}
+	} else if strings.Contains(fixed[idx], "<!--:STAGE:-->") &&
+		strings.Contains(fixed[idx], "[&acd;]") {
+		fixed[idx] = strings.Replace(fixed[idx], "&acd;", "<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>", 1)
+		// Found an fixed[idx] for a running job;
+		// fetch the stage, if defined, and add it to the
+		// live line's view.
+		var jidStart, jidEnd int
+		var jobID string
+		jidStart = strings.Index(fixed[idx], "<!--JOBID:")
+		if jidStart != -1 {
+			jidStart += len("<!--JOBID:")
+			jidEnd = strings.Index(fixed[idx], ":JOBID-->")
+		}
+		if jidStart != -1 && jidEnd != -1 {
+			jobID = fixed[idx][jidStart:jidEnd]
+		}
+		if runningJobs[jobID] != nil {
+			currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
+
+			if e == nil {
+				//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
+				fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->",
+					" ["+
+						strings.TrimSpace(string(currentStage))+
+						"<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px; padding-left:1px;' src='images/stage-throbber.gif'/>"+
+						"]", 1)
+			}
+		}
+	}
+	return fixed
+}
+
+func patchLiveViewOfRunLogEntries(orig []string, horizon int) (fixed []string) {
 	//FIXME: There is definitely a less copy-intensive way to do this.
 	//
 	// The data being patched is a 'live' view, limited to a tail
@@ -1200,68 +1291,7 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 		}
 
 		for idx := l; idx > horizon; idx-- {
-			if strings.Count(fixed[idx], "<!--COMPLETION-->") != 0 {
-				// Found a completed job. Seek a few entries back
-				// to mark the job launch stmt, hiding the in-progress
-				// and cancel links within.
-				var jidStart, jidEnd int
-				var jobID string
-				jidStart = strings.Index(fixed[idx], "<!--JOBID:")
-				if jidStart != -1 {
-					jidStart += len("<!--JOBID:")
-					jidEnd = strings.Index(fixed[idx], ":JOBID-->")
-				}
-				if jidStart != -1 && jidEnd != -1 {
-					jobID = fixed[idx][jidStart:jidEnd]
-					jobTag := "<!--JOBID:" + jobID + ":JOBID-->"
-					for seekIdx := idx - 1; seekIdx >= 0 && seekIdx > horizon; seekIdx-- {
-						// NOTE we're modifying the 'live' view of
-						// the logfile, not the direct data on disk, so
-						// no need to replace byte-for-byte.
-						// (If this func is optimized to be zero-copy
-						//  however, it might need to be.)
-						if strings.Contains(fixed[seekIdx], jobTag) {
-							fixed[seekIdx] = strings.Replace(fixed[seekIdx],
-								"display:inline", "display:none", -1)
-							if indStyle == indStyleBoth || indStyle == indStyleIndent {
-								fixed[seekIdx] = strings.Replace(fixed[seekIdx],
-									"---", "------", 1)
-							} else if indStyle == "colour" {
-								fixed[seekIdx] = strings.Replace(fixed[seekIdx],
-									"[job", "   [job", 1)
-							}
-						}
-					}
-				}
-			} else if strings.Contains(fixed[idx], "<!--:STAGE:-->") &&
-				strings.Contains(fixed[idx], "[&acd;]") {
-				fixed[idx] = strings.Replace(fixed[idx], "&acd;", "<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>", 1)
-				// Found an entry for a running job;
-				// fetch the stage, if defined, and add it to the
-				// live line's view.
-				var jidStart, jidEnd int
-				var jobID string
-				jidStart = strings.Index(fixed[idx], "<!--JOBID:")
-				if jidStart != -1 {
-					jidStart += len("<!--JOBID:")
-					jidEnd = strings.Index(fixed[idx], ":JOBID-->")
-				}
-				if jidStart != -1 && jidEnd != -1 {
-					jobID = fixed[idx][jidStart:jidEnd]
-				}
-				if runningJobs[jobID] != nil {
-					currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
-
-					if e == nil {
-						//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
-						fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->",
-							" ["+
-							strings.TrimSpace(string(currentStage))+
-							"<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px; padding-left:1px;' src='images/stage-throbber.gif'/>"+
-							"]", 1)
-					}
-				}
-			}
+			fixed = patchLiveRunEntries(idx, horizon, fixed)
 		}
 	}
 	return fixed

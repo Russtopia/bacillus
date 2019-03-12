@@ -1,7 +1,7 @@
 # bacillɥs - A minimalist Build Automation/CI service
 
 
-bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L**inecount **ɥ**(micro)-**S**ervice) listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from git commit hooks, or anything else one can think of.
+bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L**inecount **&mu;**(micro)-**S**ervice) listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from git commit hooks, or anything else one can think of.
 
 ![https://gogs.blitter.com/Russtopia/bacillus/raw/master/images/screenshot-1.png](https://gogs.blitter.com/Russtopia/bacillus/raw/master/images/screenshot-1.png)
 
