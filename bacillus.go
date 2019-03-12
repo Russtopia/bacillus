@@ -1,8 +1,4 @@
-// Package bacillus is a Webhook listener that dispatches
-// arbitrary commands on receipt of webhook events.
-// Supported webhook event formats: gogs, (.. future)
-//
-// Qui verifiers ratum efficiat?
+// bacillus - a A minimalist Build Automation/CI service
 package main
 
 import (
@@ -36,8 +32,8 @@ const (
 
 var (
 	server             *http.Server
-	addrPort           string
-	basicAuth          bool   // basic http auth
+	addrPort           string // eg. ":9990"
+	basicAuth          bool   // flag: basic http auth
 	strUser            string // API user
 	strPasswd          string // API passwd
 	attachStdout       bool
@@ -50,15 +46,15 @@ var (
 	cmdMap          map[string]string
 	runningJobs     runningJobList //map[string]string
 	jobHomeDir      string
-	artifactBaseDir string
 	runLogTailLines int
 
 	//checkSeq string
 	//errSeq   string
 	//playSeq  string
 
-	jobCancellers map[string]func()
-
+	// instColours is used for colouring job entry output if
+	// enabled, to aid in visually matching launch/completion
+	// entries
 	instColours = []string{
 		"floralwhite",
 		"burlywood",
@@ -80,12 +76,25 @@ var (
 		"goldenrod"}
 )
 
+// runningJobInfo stores some essential bits about a
+// running job so they can be cancelled, and to track
+// stages of jobs if they update their _stage files
+// key: jobID
 type runningJobInfo struct {
-	jobTag  string
-	workDir string
+	jobCanceller context.CancelFunc
+	jobTag       string
+	workDir      string
 }
 
-type runningJobList map[string]runningJobInfo
+// runningJobList is the map of runningJobInfo entries
+type runningJobList map[string]*runningJobInfo
+
+// wrapper for io.WriteString() to ignore errors -- error-handling
+// is useless to us for this application. Instead just log the error.
+// Mostly to make gometalinter shut up.
+func writeStr(w io.Writer, s string) {
+	_, _ = io.WriteString(w, s) // nolint:errcheck
+}
 
 // There is a smattering of HTML and JS in this project, programmatically
 // generated.
@@ -94,6 +103,8 @@ type runningJobList map[string]runningJobInfo
 // I didn't design this thing up-front, I wrote it to scratch an itch.
 // That's what 'agile design' gets you :p
 
+// xhrlinkCSSFrag emits CSS style used to mark job manual
+// launch ('Play Job') entries in the dashboard.
 func xhrlinkCSSFrag() string {
 	return `<style>
 		a.xhrlink {
@@ -115,8 +126,9 @@ func xhrlinkCSSFrag() string {
 		`
 }
 
-// Emit JS function suitable for calling from an html element
-// Typically used for an onclick event to fire off an async GET req.
+// xmlHTTPRequester emits a JS function suitable for calling from an
+// html element. Typically used for an onclick event to fire off an
+// async GET request.
 func xmlHTTPRequester(jsFuncName string, uri string, respHandlerJS string) string {
 	return `
 <script>
@@ -135,31 +147,42 @@ func xmlHTTPRequester(jsFuncName string, uri string, respHandlerJS string) strin
 </script>`
 }
 
+// xhrRunningJobsCountHandler emits a string representation of the
+// number of currently running jobs.
 func xhrRunningJobsCountHandler(w http.ResponseWriter, r *http.Request) {
-	_, _ = io.WriteString(w, fmt.Sprintf("%d", len(runningJobs)))
+	writeStr(w, fmt.Sprintf("%d", len(runningJobs)))
 }
 
+// xhrLiveRunLogHandler emits an HTML fragment containing the specified
+// number of runlog entries.
+// params: r.URL.Query()["tl"][0] - uint, # of entries to yield
 func xhrLiveRunLogHandler(w http.ResponseWriter, r *http.Request) {
 	tl := 6
 	v, ok := r.URL.Query()["tl"]
 	if ok {
-		fmt.Sscanf(v[0], "%d", &tl)
+		fmt.Sscanf(v[0], "%d", &tl) // nolint:errcheck
 	}
-	io.WriteString(w, liveRunLogHTML(tl))
+	writeStr(w, liveRunLogHTML(tl)) // nolint:errcheck
 }
 
+// favIconHTML emits an HTML fragment with the page's favIcon.
 func favIconHTML() string {
 	return `<link rel="icon" type="image/jpg" href="/images/logo.jpg"/>`
 }
 
+// logoShortHdrHTML emits an HTML fragment with the project logo/name/version
 func logoShortHdrHTML() string {
-	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
+	return `<img style='float:left;' width='16' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
 }
 
+// logoShortHdrHTML emits an HTML fragment with the project logo/name/version
+// and a link to the project's homepage.
 func logoHdrHTML() string {
-	return `<img style='float:left;' width='16px' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a target='_' href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
+	return `<img style='float:left;' width='16' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a target='_' href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
 }
 
+// bodyBgndHTMLAttribs emits an HTML fragment specifying the CSS background
+// for the page.
 func bodyBgndHTMLAttribs() string {
 	if shutdownModeActive {
 		return ` style='background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.8) 100%); background-image: url("/images/bacillus-shutdown.jpg"); background-size: cover;'`
@@ -168,7 +191,7 @@ func bodyBgndHTMLAttribs() string {
 }
 
 // goBackJS() returns a JS fragment to make a page go back after a
-// short delay.
+// specified delay.
 func goBackJS(pages, ms string) string {
 	return fmt.Sprintf(`
 <script>
@@ -178,6 +201,7 @@ func goBackJS(pages, ms string) string {
 `, pages, ms)
 }
 
+// refreshMetaTag returns an HTML fragment defining the page refresh interval.
 func refreshMetaTag(stat rune, intervalSecs string) string {
 	if stat == 'r' {
 		return `<meta http-equiv="refresh" content="` + intervalSecs + `">`
@@ -197,6 +221,9 @@ func forceReloadOnHistJS() string {
   `
 }
 
+// consActiveSpinnerCSS returns a CSS fragment defining the appearance
+// and behaviour of a spinner if the enclosing page defines an element
+// with ids #spinner, #finOKMarker and #finErrMarker.
 func consActiveSpinnerCSS() string {
 	return `
   <style>
@@ -246,6 +273,8 @@ func consActiveSpinnerCSS() string {
   `
 }
 
+// consActiveSpinnerJS returns JS code to animate a spinner element on
+// the enclosing page, having a DOM id of #spinner.
 func consActiveSpinnerJS(stat rune, codeColor, statWord string) string {
 	if stat == 'r' {
 		return `<script>
@@ -286,6 +315,9 @@ appendSpinner = function() {
 </script>`
 }
 
+// compatJS emits a JS fragment to return the proper cross-browser version
+// of document.scrollingElement, used to set the vertical scroll position
+// of the current page.
 func compatJS() string {
 	return `
     <script>
@@ -308,10 +340,11 @@ func compatJS() string {
 	`
 }
 
-// Get HTML for 'live' runlog with a specified # of tail lines
-// Mean to be inserted within a serve-out complete HTML page
-// (for just an HTML fragment to be inserted by client-side
-//  see xurLiveRunLogHandler())
+// liveRunLogHTML returns the HTML for 'live' runlog with a specified # of
+// tail lines, updated to reflect the current running status of pending jobs.
+// The output is meant to be inserted within an enclosing, complete HTML page.
+// (For just an HTML fragment of some specific # of most recent entries,
+// to be inserted by client-side, see xurLiveRunLogHandler())
 func liveRunLogHTML(tl int) (ret string) {
 	rl, _ := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 
@@ -338,6 +371,10 @@ func liveRunLogHTML(tl int) (ret string) {
 	return
 }
 
+// manualJobTriggersJS returns a JS fragment for each defined job,
+// meant to be bound to be onclick event of their corresponding
+// 'Play Job' links in the dashboard or full runlog pages
+// See manualJobTriggersHTML()
 func manualJobTriggersJS() (ret string) {
 	// Put in the click JS functions first
 	keys := make([]string, len(cmdMap))
@@ -346,6 +383,10 @@ func manualJobTriggersJS() (ret string) {
 	}
 	sort.Strings(keys)
 
+	// For each endpoint 'fn', add a JS fragment which is a
+	// function which will be bound elsewhere to the onclick
+	// event of the job's link in the manual job trigger section
+	// of the page: see manualJobTriggersHTML().
 	for _, k := range keys {
 		if len(cmdMap[k]) > 0 {
 			fn := strings.Replace(k, "-", "", -1)
@@ -359,8 +400,18 @@ func manualJobTriggersJS() (ret string) {
 	return
 }
 
-// Scan script for build parameter form specifiers.
-// returns false if there are none, otherwise true
+func hasParameterSpecifier(line string) bool {
+	if strings.HasPrefix(line, "#-?") ||
+		strings.HasPrefix(line, "/*-?") ||
+		strings.HasPrefix(line, "//*-?") {
+		return true
+	}
+	return false
+}
+
+// isParameterizedBuildScript scans job script scriptFName for build
+// parameter form specifiers.
+// It returns false if there are none, otherwise true
 func isParameterizedBuildScript(scriptFName string) bool {
 	isParamJob := false
 	fileBytes, e := ioutil.ReadFile(jobHomeDir + strings.TrimPrefix(scriptFName, ".."))
@@ -370,9 +421,7 @@ func isParameterizedBuildScript(scriptFName string) bool {
 	}
 	lines := strings.Split(string(fileBytes), "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "#-?") ||
-			strings.HasPrefix(line, "/*-?") ||
-			strings.HasPrefix(line, "//*-?") {
+		if hasParameterSpecifier(line) {
 			isParamJob = true
 		} else if isParamJob {
 			break
@@ -381,8 +430,9 @@ func isParameterizedBuildScript(scriptFName string) bool {
 	return isParamJob
 }
 
-// Scan script for build parameter form specifiers.
-// returns false if there are none, otherwise true
+// genParameterizedBuildForm scans job script scriptFName for build parameter
+// form specifiers, returning an HTML fragment suitable for setting all
+// defined parameters.
 func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 	paramJobLine := false
 
@@ -397,10 +447,10 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 		// TODO: parse lines for "#-?" entries, build
 		// HTML page w/form to set params and pass to job
 		// via a submit link
-		if strings.HasPrefix(line, "#-?") ||
-			strings.HasPrefix(line, "/*-?") ||
-			strings.HasPrefix(line, "//*-?") {
+		if hasParameterSpecifier(line) {
 			if !paramJobLine {
+				// First entry, build form prologue
+
 				// The hidden ?paramSet will trigger
 				// the final stage of same endpoint that
 				// calls this func (launchJob)
@@ -459,6 +509,7 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 				ret += "/>&nbsp;" + paramComment + "<br />\n"
 			}
 		} else if paramJobLine {
+			// End of param specifiers, emit form epilogue
 			ret += `
 				<input type="submit" value="Build"/>
 				</form>`
@@ -468,6 +519,9 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 	return ret
 }
 
+// manualJobTriggersHTML returns an HTML fragment containing href links to
+// all defined job endpoints. Note manualJobTriggersJS() must be used
+// in conjunction with this output to bind onclick handlers to them.
 func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 	ret = "<pre style='background-color: skyblue;'>"
 	keys := make([]string, len(cmdMap))
@@ -501,6 +555,14 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 	return
 }
 
+// httpAuthSession should be used at the start of all endpoints to
+// enforce basic HTTP auth (this function is a nop if auth is disabled
+// in server config). Returns true if user is authorized, else
+// a 'Not logged in' page is sent to the client and false is returned.
+//
+// NOTE basic auth is not secure by itself; the user/password are
+// sent to the server in plaintext unless TLS protects the server.
+// A reverse proxy enforcing HTTPS on the server is highly recommended.
 func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 	w.Header().Set("Cache-Control", "no-cache")
 
@@ -515,7 +577,7 @@ func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 
 	w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
 	w.WriteHeader(http.StatusUnauthorized)
-	io.WriteString(w, "Not logged in.")
+	writeStr(w, "Not logged in.") // nolint:errcheck
 	return
 }
 
@@ -531,7 +593,7 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	io.WriteString(w, `
+	writeStr(w, `
 <html>
 <head>`+
 		favIconHTML()+
@@ -540,11 +602,11 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 		logoShortHdrHTML()+`
 </head>
 <body `+bodyBgndHTMLAttribs()+`>`)
-	io.WriteString(w, manualJobTriggersHTML(true)+
+	writeStr(w, manualJobTriggersHTML(true)+
 		`<pre id='liveRunLog'>`+liveRunLogHTML(runLogTailLines)+`</pre>`)
 
-	io.WriteString(w, manualJobTriggersJS())
-	io.WriteString(w, `
+	writeStr(w, manualJobTriggersJS())
+	writeStr(w, `
 </body>
 </html>
     `)
@@ -558,22 +620,22 @@ func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	runLog, e := ioutil.ReadFile(fmt.Sprintf("run%s.log", strings.Split(addrPort, ":")[1]))
 	if e != nil {
-		w.Write([]byte(fmt.Sprintf("%s", e)))
+		writeStr(w, fmt.Sprintf("%s", e))
 		return
 	}
-	io.WriteString(w, `
+	writeStr(w, `
 <html>
 <head>`+
 		favIconHTML()+
 		logoShortHdrHTML()+`
 </head>
-<body>`)
+<body>`) // nolint:errcheck
 
-	io.WriteString(w, `
+	writeStr(w, `
 <pre>
 `+string(runLog)+`</pre>
 </body>
-</html>`)
+</html>`) // nolint:errcheck
 }
 
 func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
@@ -582,12 +644,12 @@ func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	consoleLog, e := ioutil.ReadFile(strings.Replace(fmt.Sprintf("%s", r.URL)[1:], "/fullconsole", "", 1))
+	consoleLog, e := ioutil.ReadFile(strings.Replace(r.URL.String()[1:], "/fullconsole", "", 1))
 	if e != nil {
-		w.Write([]byte(fmt.Sprintf("%s", e)))
+		writeStr(w, fmt.Sprintf("%s", e))
 		return
 	}
-	w.Write(consoleLog)
+	writeStr(w, string(consoleLog))
 }
 
 func consoleHandler(w http.ResponseWriter, r *http.Request) {
@@ -597,9 +659,9 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read file from URL, removing leading / as workdir is rel to us
-	consoleLog, e := ioutil.ReadFile(fmt.Sprintf("%s", r.URL)[1:])
+	consoleLog, e := ioutil.ReadFile(r.URL.String()[1:])
 	if e != nil {
-		w.Write([]byte(fmt.Sprintf("%s", e)))
+		writeStr(w, fmt.Sprintf("%s", e))
 		return
 	}
 
@@ -639,7 +701,7 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 		statWord = "Done"
 	}
 
-	io.WriteString(w, `
+	writeStr(w, `
 <html>
 <head>
 `+
@@ -659,13 +721,13 @@ func consoleHandler(w http.ResponseWriter, r *http.Request) {
 <body>
 `)
 
-	io.WriteString(w, logoShortHdrHTML())
-	io.WriteString(w, "<pre>")
-	w.Write(consoleLog)
-	io.WriteString(w, "\n</pre>")
+	writeStr(w, logoShortHdrHTML())
+	writeStr(w, "<pre>")
+	writeStr(w, string(consoleLog))
+	writeStr(w, "\n</pre>")
 
-	io.WriteString(w, "<pre>"+fmt.Sprintln(r.URL)+"</pre>")
-	io.WriteString(w, `
+	writeStr(w, "<pre>"+fmt.Sprintln(r.URL)+"</pre>")
+	writeStr(w, `
 </body>
 </html>
 `)
@@ -755,23 +817,23 @@ func execJob(j jobCtx) {
 		// by the top "/" endpoint to show recently active jobs (ie., those with
 		// workdirs still present)
 		//
-		fmt.Fprintf(c.Stdout, "[r 255]\n")
-		fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1))
-		fmt.Fprintf(c.Stdout, "%s\n", j.jobTag)
+		fmt.Fprintf(c.Stdout, "[r 255]\n")                                                                          //nolint:errcheck
+		fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1)) //nolint:errcheck
+		fmt.Fprintf(c.Stdout, "%s\n", j.jobTag)                                                                     //nolint:errcheck
 
 		cerr := c.Start()
 		if cerr != nil {
 			log.Printf("[exec.Cmd: %+v]\n", c)
 			j.w.WriteHeader(500)
-			j.w.Write([]byte("ERR"))
+			writeStr(j.w, "ERR")
 			log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
 				j.jobTag)
 		} else {
 			//runningJobCount += 1
-			runningJobs[jobID] = runningJobInfo{j.jobTag, workDir}
+			runningJobs[jobID] = &runningJobInfo{
+				jobCanceller: cmdCancelFunc, jobTag: j.jobTag, workDir: workDir}
 
-			jobCancellers[jobID] = cmdCancelFunc
-			j.w.Write([]byte("OK"))
+			writeStr(j.w, "OK")
 			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]<!--:STAGE:--></span>\n",
 				jobID, instColour,
 				workerOutputRelPath,
@@ -782,9 +844,6 @@ func execJob(j jobCtx) {
 		werr := c.Wait()
 		//runningJobCount -= 1
 		delete(runningJobs, jobID)
-
-		//jobCancellers[jobID]()
-		delete(jobCancellers, jobID)
 
 		if werr, ok := werr.(*exec.ExitError); ok {
 			// The program has exited with an exit code != 0
@@ -799,7 +858,7 @@ func execJob(j jobCtx) {
 				// exec.Cmd automatically closes its files on exit, so we need to
 				// reopen here to write the status at offset 0
 				workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-				fmt.Fprintf(workerOutputFile, "[f %03d]", int8(exitStatus))
+				fmt.Fprintf(workerOutputFile, "[f %03d]", int8(exitStatus)) //nolint:errcheck
 				//log.Print(c.Stderr /*stdErrBuffer*/)
 				//log.Printf("%s[Exit Status: %d]\n", indentStr, int32(exitStatus)) //#
 			}
@@ -807,7 +866,7 @@ func execJob(j jobCtx) {
 			// exec.Cmd automatically closes its files on exit, so we need to
 			// reopen here to write the status at offset 0
 			workerOutputFile, _ = os.OpenFile(workerOutputPath, os.O_RDWR, 0777)
-			fmt.Fprintf(workerOutputFile, "[f %03d]", 0)
+			fmt.Fprintf(workerOutputFile, "[f %03d]", 0) //nolint:errcheck
 			//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
 		}
 
@@ -841,7 +900,7 @@ func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		jobID = v[0]
 	}
-	io.WriteString(w, `
+	writeStr(w, `
 					<html>
 					<head>`+
 		favIconHTML()+
@@ -849,21 +908,26 @@ func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
 					</head>
 					<body `+bodyBgndHTMLAttribs()+`>
 					`)
-	if jobCancellers[jobID] != nil {
-		jobCancellers[jobID]()
-		io.WriteString(w, fmt.Sprintf("<pre>Cancelled jobID %s</pre>\n", jobID))
+	if runningJobs[jobID] != nil && runningJobs[jobID].jobCanceller != nil {
+		runningJobs[jobID].jobCanceller()
+		writeStr(w, fmt.Sprintf("<pre>Cancelled jobID %s</pre>\n", jobID))
 	} else {
-		io.WriteString(w, fmt.Sprintf("<pre>jobID %s already done or not found.</pre>\n", jobID))
+		writeStr(w, fmt.Sprintf("<pre>jobID %s already done or not found.</pre>\n", jobID))
 	}
-	io.WriteString(w, `
+	writeStr(w, `
 					</body>
 					</html>`)
 }
 
-// Launch a job listener endpoint, which either directly calls a job,
-// or has links to itself (with ?param, ?paramSet URI parameters) letting
-// the user enter job parameters via a dynamically-generated form prior to
-// launch. (In this way the HandleFunc is potentially recursive.)
+// Launch a job listener endpoint, which in the case of simple jobs
+// directly calls the job, or, in the case of parameterized jobs,
+// dynamically builds and emits a page containing an HTML form with which
+// the user may set job parameters before submitting to launch the job.
+//
+// The HTML emitted is selected by whether the visiting URL has
+// no parameters, ?param or ?paramSet: no parameters directly launches a job,
+// ?param emits an HTML form page, and ?paramSet launches the job with the
+// submitted parameters from the ?param form page.
 func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
 	origJobEnv := jobEnv // saved to reset the env on each invocation
 
@@ -877,6 +941,10 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				return
 			}
 
+			// Depending on whether the page being emitted is ?param (form)
+			// or ?paramSet (form submission/job launch), set how many
+			// pages the launch confirmation page needs to jump back
+			// to return to the dashboard or runlog page.
 			var pagesBack string
 			_, ok := r.URL.Query()["paramSet"]
 			if ok {
@@ -897,34 +965,38 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				headerFragM = ""
 			}
 
-			io.WriteString(w, headerFragS+headerFragM+headerFragE)
-			io.WriteString(w, bodyFragB)
+			writeStr(w, headerFragS+headerFragM+headerFragE)
+			writeStr(w, bodyFragB)
 
 			if shutdownModeActive {
 				bodyFragM = fmt.Sprintf("<pre>Server is in shutdown mode, come back later.</pre>\n")
 				bodyFragM += goBackJS(pagesBack, "3000")
 			} else if _, ok := r.URL.Query()["param"]; ok {
+				// Get job-defined parameter form
 				bodyFragM = genParameterizedBuildForm(jobTag, cmd)
 			} else if _, ok = r.URL.Query()["paramSet"]; ok {
-				// If we're called back with paramSet, which is submitted
-				// form data from dynamically-generated param form above,
+				// If we're called back with ?paramSet, which is submitted
+				// form data from dynamically-generated ?param form above,
 				// parse those values from r.URL.Query(), adding to jobEnv[].
-				r.ParseForm()
+				r.ParseForm() //nolint:errcheck
 				for k, v := range r.Form {
 					if len(v) > 0 {
 						jobEnv = append(jobEnv, k+`="`+v[0]+`"`)
 					}
 				}
 				bodyFragM = fmt.Sprintf("<pre>Triggered parameterized build %s</pre>\n", jobTag)
+				// Launch parameterized job
 				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
 			} else {
+				// Launch simple job
 				bodyFragM = fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag)
 				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
 			}
-			fmt.Fprintf(w, bodyFragM+bodyFragE)
+			fmt.Fprintf(w, bodyFragM+bodyFragE) // nolint:errcheck
 		})
 }
 
+// rootPageHandler serves the 'root' ('main' or 'dashboard') page.
 func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	// See if there are actions (currently just logout)
 	_, ok := r.URL.Query()["logout"]
@@ -932,8 +1004,8 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-type", "text/html")
 		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
 		w.WriteHeader(http.StatusUnauthorized)
-		//io.WriteString(w, `<head><meta http-equiv="refresh" content="0;URL='/'" /></head>`)
-		io.WriteString(w, `<pre><a href='/'>You must log in.</a></pre>`)
+		//writeStr(w, `<head><meta http-equiv="refresh" content="0;URL='/'" /></head>`)
+		writeStr(w, `<pre><a href='/'>You must log in.</a></pre>`)
 		return
 	}
 
@@ -942,7 +1014,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	io.WriteString(w, `
+	writeStr(w, `
 <html>
 <head>`+
 		favIconHTML()+
@@ -954,8 +1026,8 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 </head>
   <body `+bodyBgndHTMLAttribs()+`>
 		`)
-	io.WriteString(w, logoHdrHTML())
-	io.WriteString(w, `
+	writeStr(w, logoHdrHTML())
+	writeStr(w, `
   <pre>
 <a href='/runlog'>/runlog</a>: main log/activity view
 <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
@@ -981,31 +1053,42 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
   <a href='/cancelshutdown'>cancel a planned shutdown</a>
 `)
 	if basicAuth {
-		io.WriteString(w, `  <a href='`+logoutURI+`'>logout</a>
+		writeStr(w, `  <a href='`+logoutURI+`'>logout</a>
 `)
 	}
-	io.WriteString(w, `
+	writeStr(w, `
   Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
   <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
   </pre>`)
 
-	io.WriteString(w, manualJobTriggersJS())
-	io.WriteString(w, `
+	writeStr(w, manualJobTriggersJS())
+	writeStr(w, `
 </body>
 </html>
 	`)
 }
 
+// Perform a logout from HTTP Basic Auth
+//
+// Apparently it is quite difficult to clean out HTTP basic auth in modern
+// browsers.
+//
 // This hack is from https://stackoverflow.com/a/14329930/1012159
 var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.execCommand("ClearAuthenticationCache")}catch(d){}a||((a=window.XMLHttpRequest?new window.XMLHttpRequest:window.ActiveXObject?new ActiveXObject("Microsoft.XMLHTTP"):void 0)?(a.open("HEAD",c||location.href,!0,"logout",(new Date).getTime().toString()),a.send(""),a=1):a=void 0);a||(b="Your browser is too old or too weird to support log out functionality. Close all windows and restart the browser.");alert(b)})(/*pass safeLocation here if you need*/);`
 
 //var logoutURI = `/?logout`
 
+// cancelShutdownHandler .. does what you'd expect, cancels a planned
+// server shutdown.
+//
+// NOTE the server does not itself shutdown after scheduling one without
+// explicit admin action, by killing the process or manually visiting
+// the /rudeshutdown URI endpoint.
 func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
 	shutdownModeActive = false
 	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, `
+	writeStr(w, `
 					<html>
 					<head>`+
 		favIconHTML()+
@@ -1013,17 +1096,20 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
-	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
-	io.WriteString(w, `
+	writeStr(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
+	writeStr(w, `
 					</body>
 					</html>`)
 }
 
+// shutdownHandler puts the server into shutdown mode: refuse to start
+// any new jobs until the /cancelshutdown endpoint is visited, or
+// the admin kills the server or visits /rudeshutdown to tell it to exit.
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
 	shutdownModeActive = true
 	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, `
+	writeStr(w, `
 					<html>
 					<head>`+
 		favIconHTML()+
@@ -1031,29 +1117,30 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
-	io.WriteString(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
-	io.WriteString(w, `
+	writeStr(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
+	writeStr(w, `
 					</body>
 					</html>`)
 }
 
+// aboutPageHandler displays author/license information.
 func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
 	if !httpAuthSession(w, r) {
 		return
 	}
 
-	io.WriteString(w, `
+	writeStr(w, `
 <html>
 <head>`+
 		favIconHTML()+
-		xhrlinkCSSFrag()+
-		xmlHTTPRequester("xhrLiveRunLogUpdate", fmt.Sprintf("/api/lru?tl=%d", runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
+		//xhrlinkCSSFrag()+
+		//xmlHTTPRequester("xhrLiveRunLogUpdate", fmt.Sprintf("/api/lru?tl=%d", runLogTailLines), `document.getElementById('liveRunLog').innerHTML = xhttp.response;`)+
 		logoShortHdrHTML()+`
 </head>
 <body `+bodyBgndHTMLAttribs()+`>`)
-	io.WriteString(w, `<p><img src="images/BenderCI.jpg" width="600px"/></p>`)
-	io.WriteString(w, goBackJS("1", "10000"))
-	io.WriteString(w, `<pre>
+	writeStr(w, `<p><img src="images/BenderCI.jpg" width="600"/></p>`)
+	writeStr(w, goBackJS("1", "10000"))
+	writeStr(w, `<pre>
   bacill&mu;s CI server. Written in <a href="https://golang.org/">Go</a>
   &copy; Copyright 2019 by Russ Magee. All Rights Reserved.
 </pre>
@@ -1063,25 +1150,29 @@ func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// rudeShutdownHandler tells the server to exit. The /shutdown endpoint
+// should be visited and, if possible, running jobs be allowed to finish
+// before using this endpoint.
 func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
 	w.Header().Set("Content-type", "text/html")
-	io.WriteString(w, `
+	writeStr(w, `
 					<html>
 					<head>`+
 		favIconHTML()+`
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
-	io.WriteString(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
-	io.WriteString(w, `
+	writeStr(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
+	writeStr(w, `
 					</body>
 					</html>`)
 	killSwitch <- true
 }
 
-//FIXME: There is definitely a less copy-intensive way to do this.
 func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
+	//FIXME: There is definitely a less copy-intensive way to do this.
+	//
 	// The data being patched is a 'live' view, limited to a tail
 	// portion of the actual run.log. In light of this we only need
 	// to reconcile finished jobs back a short distance, larger than
@@ -1158,10 +1249,17 @@ func patchCompletedJobsInLog(orig []string, horizon int) (fixed []string) {
 				if jidStart != -1 && jidEnd != -1 {
 					jobID = fixed[idx][jidStart:jidEnd]
 				}
-				currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
-				if e == nil {
-					//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
-					fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " ["+strings.TrimSpace(string(currentStage))+"]", 1)
+				if runningJobs[jobID] != nil {
+					currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
+
+					if e == nil {
+						//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
+						fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->",
+							" ["+
+							strings.TrimSpace(string(currentStage))+
+							"<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px; padding-left:1px;' src='images/stage-throbber.gif'/>"+
+							"]", 1)
+					}
 				}
 			}
 		}
@@ -1187,8 +1285,7 @@ func main() {
 	mainCtx := context.Background()
 
 	cmdMap = make(map[string]string)
-	runningJobs = make(map[string]runningJobInfo)
-	jobCancellers = make(map[string]func())
+	runningJobs = make(map[string]*runningJobInfo)
 
 	var logfile *os.File
 	var cerr error
@@ -1251,7 +1348,7 @@ func main() {
 	// entries (yeah it's cheesy and probably error-prone if server was
 	// killed during running jobs. Big deal, those entries
 	// wouldn't show completion anyhow).
-	logfile.Seek(0, 2)
+	_, _ = logfile.Seek(0, 2)
 
 	// Make a filesystem available for dir/file storage & retrieval by
 	// jobs and devs. Jobs are responsible for its proper use.
@@ -1315,6 +1412,6 @@ func main() {
 	}()
 
 	// .. and wait for a rude shutdown if requested
-	_ = <-killSwitch
-	server.Shutdown(nil)
+	<-killSwitch
+	_ = server.Shutdown(mainCtx)
 }

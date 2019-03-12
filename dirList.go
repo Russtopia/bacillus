@@ -53,8 +53,7 @@ func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	upath := r.URL.EscapedPath()
 	//upath := path.Clean(r.URL.Path)
 
-	var fullpath string
-	fullpath = rootpath
+	fullpath := rootpath
 	if upath != "." {
 		fullpath = fmt.Sprintf("%s%c%s", rootpath, os.PathSeparator, upath)
 	}
@@ -119,13 +118,13 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 		w.Header().Set(h, v)
 	}
 
-	fmt.Fprintf(w, preamble)
+	_, _ = fmt.Fprintf(w, preamble)
 
 	if upath != "." {
-		fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
+		_, _ = fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
 	}
 	if len(dirs) == 0 {
-		fmt.Fprintf(w, usrDirListE())
+		_, _ = fmt.Fprintf(w, usrDirListE())
 	} else {
 		for _, d := range dirs {
 			name := d.Name()
@@ -136,10 +135,10 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 			// part of the URL path, and not indicate the start of a query
 			// string or fragment.
 			url := url.URL{Path: name}
-			fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"%s\">%s</a>\n", url.String(), htmlReplacer.Replace(name))
+			_, _ = fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"%s\">%s</a>\n", url.String(), htmlReplacer.Replace(name))
 		}
 	}
-	fmt.Fprintf(w, usrDirListPost())
+	_, _ = fmt.Fprintf(w, usrDirListPost())
 }
 
 func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
