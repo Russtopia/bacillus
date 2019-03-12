@@ -384,7 +384,7 @@ func liveRunLogHTML(tl int) (ret string) {
 // 'Play Job' links in the dashboard or full runlog pages
 // See manualJobTriggersHTML()
 func manualJobTriggersJS() (ret string) {
-	// Put in the click JS functions first
+	// sort the job keys
 	keys := make([]string, len(cmdMap))
 	for k := range cmdMap {
 		keys = append(keys, k)
@@ -844,12 +844,12 @@ func execJob(j jobCtx) {
 			log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
 				j.jobTag)
 		} else {
-			//runningJobCount += 1
 			runningJobs[jobID] = &runningJobInfo{
 				jobCanceller: cmdCancelFunc, jobTag: j.jobTag, workDir: workDir}
 
 			writeStr(j.w, "OK")
-			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]<!--:STAGE:--></span>\n",
+			log.Printf("<!--JOBID:%s:JOBID-->"+
+				"<span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]<!--:STAGE:--></span>\n",
 				jobID, instColour,
 				workerOutputRelPath,
 				indentStr,
@@ -1042,6 +1042,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   <body `+bodyBgndHTMLAttribs()+`>
 		`)
 	writeStr(w, logoHdrHTML())
+	//writeStr(w, "<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>")
 	writeStr(w, `
   <pre>
 <a href='/runlog'>/runlog</a>: main log/activity view
