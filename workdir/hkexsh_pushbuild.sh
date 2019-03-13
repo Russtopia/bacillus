@@ -18,6 +18,7 @@ echo "---"
 function stage {
   local _stage="${BACILLUS_WORKDIR}"/_stage
   
+  echo -e "\n--STAGE: ${1}--\n"
   if [ ! -f ${_stage} ]; then
     echo -n "$1" >"${BACILLUS_WORKDIR}"/_stage
   else

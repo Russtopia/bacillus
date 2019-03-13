@@ -51,10 +51,11 @@ var (
 	indStyle    string
 	instCounter uint32
 	//runningJobCount uint
-	cmdMap          map[string]string
-	runningJobs     runningJobList //map[string]string
-	jobHomeDir      string
-	runLogTailLines int
+	cmdMap               map[string]string
+	runningJobs          runningJobList //map[string]string
+	jobHomeDir           string
+	runLogTailLines      int
+	showStagesOnFinished bool
 
 	//checkSeq string
 	//errSeq   string
@@ -139,6 +140,7 @@ func xhrlinkCSSFrag() string {
 // async GET request.
 func xmlHTTPRequester(jsFuncName string, uri string, respHandlerJS string) string {
 	return `
+<!--!A<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>-->
 <script>
 	function ` + jsFuncName + `() {
 		// IDGAF about IE 5/6, nor should you
@@ -400,8 +402,8 @@ func manualJobTriggersJS() (ret string) {
 			fn := strings.Replace(k, "-", "", -1)
 			ret += xmlHTTPRequester(fn, k, "")
 			ret += `<script>
-			setInterval( xhrLiveRunLogUpdate, 1000 );
-			setInterval( xhrRunningJobsCount, 1000 );
+			setInterval( xhrLiveRunLogUpdate, 2000 );
+			setInterval( xhrRunningJobsCount, 2000 );
 			</script>`
 		}
 	}
@@ -553,7 +555,7 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 					k, k, cmdMap[k])
 			} else {
 				fn := strings.Replace(k, "-", "", -1)
-				ret += fmt.Sprintf("<a class='xhrlink' onclick='%s(); return false;' title='Play Job' href='%s'>[&rtrif;] %s [action %s]</a>\n",
+				ret += fmt.Sprintf(`<a class='xhrlink' onclick='%s(); return false;' title='Play Job' href='%s'>[&rtrif;] %s [action %s]</a>`+"\n",
 					fn, k, k, cmdMap[k])
 			}
 		}
@@ -849,7 +851,7 @@ func execJob(j jobCtx) {
 
 			writeStr(j.w, "OK")
 			log.Printf("<!--JOBID:%s:JOBID-->"+
-				"<span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[job %s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]<!--:STAGE:--></span>\n",
+				"<span style='background-color:%s'><a style='display:inline;' href='%s' title='Running'>[&acd;]</a>%s[%s{%s}<a style='display:inline;' href='/cancel/?id=%s' title='Cancel'>[&cross;]</a> triggered.]<!--:STAGE:--></span>\n",
 				jobID, instColour,
 				workerOutputRelPath,
 				indentStr,
@@ -857,8 +859,6 @@ func execJob(j jobCtx) {
 				jobID)
 		}
 		werr := c.Wait()
-		//runningJobCount -= 1
-		delete(runningJobs, jobID)
 
 		if werr, ok := werr.(*exec.ExitError); ok {
 			// The program has exited with an exit code != 0
@@ -885,22 +885,38 @@ func execJob(j jobCtx) {
 			//workerOutputFile.WriteAt([]byte(fmt.Sprintf("[f %03d]", 0)), 0)
 		}
 
+		stageStr := ""
+		if showStagesOnFinished {
+			currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
+			stageStr = string(currentStage)
+			if e == nil {
+				stageStr = " |" +
+					strings.TrimSpace(strings.Replace(getRecentStages(stageStr, 3), ":", " &compfn; ", -1)) +
+					"|"
+			} else {
+				stageStr = "|???|"
+			}
+		}
+
 		if werr == nil {
-			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]</span><!--COMPLETION-->\n",
-				jobID, instColour,
-				workerOutputRelPath,
-				indentStr,
-				j.jobTag, jobID,
-				j.jobOpts, j.jobTag, jobID)
-		} else {
-			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[job %s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]<!--:STAGE:--></span><!--COMPLETION-->\n",
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><a href='%s' title='Done'>[&check;]</a>%s[%s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Artifacts'>[&ccupssm;]</a> completed with status 0]%s</span><!--COMPLETION-->\n",
 				jobID, instColour,
 				workerOutputRelPath,
 				indentStr,
 				j.jobTag, jobID,
 				j.jobOpts, j.jobTag, jobID,
-				werr)
+				stageStr)
+		} else {
+			log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:%s'><span style='background-color:red'><a href='%s' title='Done With Errors'>[!]</a></span>%s[%s{%s}<a href='/artifacts/bacillus_%s_%s_%s/' title='Partial Artifacts'>[&ccups;]</a> completed with error %s]%s</span><!--COMPLETION-->\n",
+				jobID, instColour,
+				workerOutputRelPath,
+				indentStr,
+				j.jobTag, jobID,
+				j.jobOpts, j.jobTag, jobID,
+				werr,
+				stageStr)
 		}
+		delete(runningJobs, jobID)
 	}
 }
 
@@ -1002,10 +1018,15 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				bodyFragM = fmt.Sprintf("<pre>Triggered parameterized build %s</pre>\n", jobTag)
 				// Launch parameterized job
 				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
+
+				//!A writeStr(w, `<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>`)
+				//!A writeStr(w, `<script>document.getElementById("jobRunSound").play();</script>`)
 			} else {
 				// Launch simple job
 				bodyFragM = fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag)
 				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
+				//!A writeStr(w, `<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>`)
+				//!A writeStr(w, `<script>document.getElementById("jobRunSound").play();</script>`)
 			}
 			fmt.Fprintf(w, bodyFragM+bodyFragE) // nolint:errcheck
 		})
@@ -1042,7 +1063,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
   <body `+bodyBgndHTMLAttribs()+`>
 		`)
 	writeStr(w, logoHdrHTML())
-	//writeStr(w, "<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>")
+	//!A writeStr(w, "<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>")
 	writeStr(w, `
   <pre>
 <a href='/runlog'>/runlog</a>: main log/activity view
@@ -1186,6 +1207,15 @@ func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	killSwitch <- true
 }
 
+func getRecentStages(s string, depth int) string {
+	stageStr := string(s)
+	stages := strings.Split(stageStr, ":")
+	if len(stages) > depth {
+		stageStr = fmt.Sprintf("... %s", strings.Join(stages[len(stages)-depth:], ":"))
+	}
+	return stageStr
+}
+
 // patchLiveRunEntries looks at a limited back-history of runlog entries
 // and updates ones representing currently-running jobs with live status.
 //
@@ -1248,14 +1278,13 @@ func patchLiveRunEntries(idx, horizon int, fixed []string) []string {
 		}
 		if runningJobs[jobID] != nil {
 			currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
-
 			if e == nil {
-				//fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->", " <img style='height:1em; margin:0px; padding:0px;' src='images/run-throbber.gif'/>[" + strings.TrimSpace(string(currentStage)) + "]", 1)
+				stageStr := getRecentStages(string(currentStage), 3)
 				fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->",
-					" ["+
-						strings.TrimSpace(string(currentStage))+
+					" |<strong>"+
+						strings.TrimSpace(strings.Replace(stageStr, ":", " &compfn; ", -1))+
 						"<img style='border:none; border-width:0px; width:0.8em; margin:0px; padding:0px; padding-left:1px;' src='images/stage-throbber.gif'/>"+
-						"]", 1)
+						"</strong>|", 1)
 			}
 		}
 	}
@@ -1311,6 +1340,7 @@ func main() {
 	flag.StringVar(&indStyle, "i", indStyleBoth, "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
+	flag.BoolVar(&showStagesOnFinished, "F", false, "set to true to show stages on finished jobs in runlog")
 	flag.Parse()
 
 	mainCtx := context.Background()
@@ -1394,6 +1424,9 @@ func main() {
 
 	http.Handle("/images/",
 		http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
+
+	//!A http.Handle("/audio/",
+	//!A 	http.StripPrefix("/audio/", http.FileServer(http.Dir("audio"))))
 
 	// Live runlog is just the tail of full runlog
 	http.HandleFunc("/fullrunlog/", fullRunlogHandler)

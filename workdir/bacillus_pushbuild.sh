@@ -6,6 +6,7 @@ mkdir -p "${BACILLUS_ARTFDIR}"
 export GO111MODULE=auto
 export GOPATH="${HOME}/go"
 export PATH=$PATH:$GOPATH/bin
+delay=4
 
 # GOCACHE will be phased out in v1.12. [github.com/golang/go/issues/26809]
 export GOCACHE="${HOME}/.cache/go-build"
@@ -13,13 +14,13 @@ export GOCACHE="${HOME}/.cache/go-build"
 function stage {
   local _stage="${BACILLUS_WORKDIR}"/_stage
   
+  echo -e "\n--STAGE: ${1}--\n"
   if [ ! -f ${_stage} ]; then
     echo -n "$1" >"${BACILLUS_WORKDIR}"/_stage
   else
     echo -n ":$1" >>"${BACILLUS_WORKDIR}"/_stage
   fi
 }
-
 
 stage "Setup"
 
@@ -61,4 +62,5 @@ grml app
 stage "Artifacts"
 
 tar czvf ${BACILLUS_ARTFDIR}/bacillus.tgz .
+
 echo "--Done--"

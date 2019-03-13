@@ -65,6 +65,7 @@ AUTH=${AUTH:-false}
 AUTH_USER=${AUTH_USER:-"foo"}
 AUTH_PASS=${AUTH_PASS:-"bar"}
 RUNLOG_LIVE_VIEW_LINES=${RUNLOG_LIVE_VIEW_LINES:-30}
+F=${F:-true} # show pipeline stages on finished job runlog entries
 
 ## If better log rotation is desired, use logrotate.
 if [ -e run"${PORT}".log ] && [ ${1:-"n"} == "-r" ]; then
@@ -88,7 +89,7 @@ fi
 ##   $HOME/bin/bacillus/artifacts/bacillus_kW* -maxdepth 0 -type d -mmin +10080)
 ##
 
-bacillus -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
+bacillus -F="${F}" -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
  -auth=${AUTH} -u=${AUTH_USER} -p=${AUTH_PASS} \
  onPush-bacillus-build:kD::"../bacillus_pushbuild.sh" \
  onPush-hkexsh-build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \

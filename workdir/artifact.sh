@@ -26,6 +26,7 @@ DEBUG=${DEBUG:-"false"}
 function stage {
   local _stage="${BACILLUS_WORKDIR}"/_stage
   
+  echo -e "\n--STAGE: ${1}--\n"
   if [ ! -f ${_stage} ]; then
     echo -n "$1" >"${BACILLUS_WORKDIR}"/_stage
   else
@@ -45,9 +46,40 @@ for i in $(seq 1 4); do
   sleep ${delay}
 done
 
+stage "S1"
+for i in $(seq 1 4); do
+  echo "Doing some work (sleeping ${delay}). $i ..."
+  sleep ${delay}
+done
+
+stage "S2"
+for i in $(seq 1 4); do
+  echo "Doing some work (sleeping ${delay}). $i ..."
+  sleep ${delay}
+done
+
+stage "S3"
+for i in $(seq 1 4); do
+  echo "Doing some work (sleeping ${delay}). $i ..."
+  sleep ${delay}
+done
+
+stage "S4"
+for i in $(seq 1 4); do
+  echo "Doing some work (sleeping ${delay}). $i ..."
+  sleep ${delay}
+done
+
 stage "Artifacts"
 ADIR="${BACILLUS_ARTFDIR}"
 mkdir -p "${ADIR}"
 echo "blah" >"${ADIR}/artifact.txt"
+
+stage "Post Processing"
+for i in $(seq 1 4); do
+  echo "Doing some work (sleeping ${delay}). $i ..."
+  sleep ${delay}
+done
+
 
 echo "--DONE--"
