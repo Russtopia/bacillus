@@ -83,10 +83,9 @@ fi
 ##
 ## PATH=/bin:/usr/bin:/usr/local/bin:$HOME/bin/bacillus
 ##
-## 0 * * * * rm -rf $(find $HOME/bin/bacillus/workdir/bacillus_kD* \
-##   $HOME/bin/bacillus/artifacts/bacillus_kD* -maxdepth 0 -type d -mmin +1440)
-## 0 * * * * rm -rf $(find $HOME/bin/bacillus/workdir/bacillus_kW* \
-##   $HOME/bin/bacillus/artifacts/bacillus_kW* -maxdepth 0 -type d -mmin +10080)
+##* * * * 1 rm -rf $(find $HOME/bacillus/artifacts $HOME/bacillus/workdir -type d -mmin +1440 -name "bacillus_kD*")
+##* * 1 * * rm -rf $(find $HOME/bacillus/artifacts $HOME/bacillus/workdir -type d -mmin +10080 -name "bacillus_kW*")
+##0 * * * * curl -s --netrc-file $HOME/bacillus-auth.txt https://bacillus.blitter.com/onPush-hkexsh-build >/dev/null 2>&1
 ##
 
 bacillus -F="${F}" -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
