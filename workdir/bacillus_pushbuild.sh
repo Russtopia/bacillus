@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Exit on error
+set -e
+
 export PATH=/usr/local/bin:/usr/bin:/usr/lib/ccache/bin:/bin
 echo "workdir: ${BACILLUS_WORKDIR}"
 mkdir -p "${BACILLUS_ARTFDIR}"
