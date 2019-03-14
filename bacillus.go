@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"blitter.com/go/brevity"
 )
 
 const (
@@ -891,7 +893,7 @@ func execJob(j jobCtx) {
 			stageStr = string(currentStage)
 			if e == nil {
 				stageStr = " |" +
-					strings.TrimSpace(strings.Replace(getRecentStages(stageStr, 3), ":", " &compfn; ", -1)) +
+					strings.TrimSpace(strings.Replace(brevity.PreEllipse(stageStr, ":", 3), ":", " &compfn; ", -1)) +
 					"|"
 			} else {
 				stageStr = "|???|"
@@ -1207,15 +1209,6 @@ func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	killSwitch <- true
 }
 
-func getRecentStages(s string, depth int) string {
-	stageStr := string(s)
-	stages := strings.Split(stageStr, ":")
-	if len(stages) > depth {
-		stageStr = fmt.Sprintf("... %s", strings.Join(stages[len(stages)-depth:], ":"))
-	}
-	return stageStr
-}
-
 // patchLiveRunEntries looks at a limited back-history of runlog entries
 // and updates ones representing currently-running jobs with live status.
 //
@@ -1279,7 +1272,7 @@ func patchLiveRunEntries(idx, horizon int, fixed []string) []string {
 		if runningJobs[jobID] != nil {
 			currentStage, e := ioutil.ReadFile(runningJobs[jobID].workDir + "/_stage")
 			if e == nil {
-				stageStr := getRecentStages(string(currentStage), 3)
+				stageStr := brevity.PreEllipse(string(currentStage), ":", 3)
 				fixed[idx] = strings.Replace(fixed[idx], "<!--:STAGE:-->",
 					" |<strong>"+
 						strings.TrimSpace(strings.Replace(stageStr, ":", " &compfn; ", -1))+
