@@ -159,13 +159,9 @@ Likewise, a web browser will present a user/pass authorization popup before allo
 
 ## Code Size
 ```
+$ sloc *.go
   Languages  Files  Code  Comment  Blank  Total  CodeLns
-      Total     14  1027      704    222   1953   100.0%
-         Go      2   741      607    109   1457    74.6%
-   Markdown      3   140        0     68    208    10.7%
-      Shell      5   100       97     40    237    12.1%
-       YAML      1    43        0      5     48     2.5%
-       Text      2     2        0      0      2     0.1%
-     Modula      1     1        0      0      1     0.1%
+      Total      3   806      744    124   1674   100.0%
+         Go      3   806      744    124   1674   100.0%
 ```
 
