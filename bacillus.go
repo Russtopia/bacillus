@@ -55,6 +55,7 @@ var (
 	//runningJobCount uint
 	cmdMap               map[string]string
 	runningJobs          runningJobList //map[string]string
+	runningJobsLimit     uint           //max running jobs
 	jobHomeDir           string
 	runLogTailLines      int
 	showStagesOnFinished bool
@@ -848,6 +849,15 @@ func execJob(j jobCtx) {
 			log.Printf("%s[ERROR on job %s trigger.]\n", indentStr,
 				j.jobTag)
 		} else {
+			if len(runningJobs) >= int(runningJobsLimit) {
+				writeStr(j.w, "WHOA BESSIE")
+				log.Printf("<!--JOBID:%s:JOBID--><span style='background-color:grey'><span style='background-color:maroon'>XXX</span>%s[%s not launched: running job limit reached]</span><!--COMPLETION-->\n",
+					jobID,
+					"", /*indentStr,*/
+					j.jobTag)
+				return
+			}
+
 			runningJobs[jobID] = &runningJobInfo{
 				jobCanceller: cmdCancelFunc, jobTag: j.jobTag, workDir: workDir}
 
@@ -1071,7 +1081,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 <a href='/runlog'>/runlog</a>: main log/activity view
 <a href='/artifacts'>/artifacts</a>: where jobs (should) leave their stuff
   
-Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span>)
+Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d", len(runningJobs))+`</span> Max `+fmt.Sprintf("%d", runningJobsLimit)+`)
 ...
 <span id='liveRunLog'>`+liveRunLogHTML(6)+`</span>
 
@@ -1332,6 +1342,7 @@ func main() {
 	flag.BoolVar(&createRunlog, "c", false, "set true/1 to create new run.log, overwriting old one")
 	flag.StringVar(&indStyle, "i", indStyleBoth, "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
+	flag.UintVar(&runningJobsLimit, "jl", 8, "Max. concurrently running jobs")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.BoolVar(&showStagesOnFinished, "F", false, "set to true to show stages on finished jobs in runlog")
 	flag.Parse()
