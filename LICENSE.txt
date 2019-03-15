@@ -1,14 +1,26 @@
-bacillμs (Build Automation/Continuous Integration Low-Linecount μ(micro)-Service) is licensed under the terms of the GPLv3: https://www.gnu.org/licenses/gpl-3.0.txt (exception 'dirList.go' described below).
+bacillμs (Build Automation/Continuous Integration Low-Linecount μ(micro)-Service)
+is licensed under the terms of the GPLv3: https://www.gnu.org/licenses/gpl-3.0.txt
+(exception 'dirList.go' described below).
 
-The PRIMARY MAINTAINERS ("RUSSELL MAGEE" <rmagee@gmail.com>) hereby reserve the right to, at sole future discretion, modify the terms of this license; such modifications shall apply to subsequent releases.
+The PRIMARY MAINTAINERS ("RUSSELL MAGEE" <rmagee@gmail.com>) hereby reserve the
+right to, at sole future discretion, modify the terms of this license; such
+modifications shall apply to subsequent releases.
 
 dirList.go
 ----------
-The 'dirList.go' source code, being substantially similar to and derived from the core Go net/http package equivalent, minus aesthetic runtime output modifications for the purpose of this product, shall remain under the MIT license as specified by the Go Authors. As such, users of this product are free to modify 'dirList.go' at will under the terms of the original MIT license notwithstanding the terms of the GPLv3 applying to the rest of the project.
+The 'dirList.go' source code, being substantially similar to and derived from the
+core Go net/http package equivalent, minus aesthetic runtime output modifications
+for the purpose of this product, shall remain under the MIT license as specified
+by the Go Authors. As such, users of this product are free to modify 'dirList.go'
+at will under the terms of the original MIT license notwithstanding the terms of
+the GPLv3 applying to the rest of the project.
 
-Contact the PRIMARY MAINTAINERS to negotiate terms of a dual-licensed release (eg., MIT or other), if you or your organization wish to create a proprietary version of the project for commercial redistribution. Otherwise the GPLv3 license shall apply.
+Contact the PRIMARY MAINTAINERS to negotiate terms of a dual-licensed release (eg.,
+MIT or other), if you or your organization wish to create a proprietary version of
+the project for commercial redistribution. Otherwise the GPLv3 license shall apply.
 
-The PRIMARY MAINTAINERS offer NO IMPLIED WARRANTY OF FITNESS FOR A PARTICULAR USE. USE AT OWN RISK.
+The PRIMARY MAINTAINERS offer NO IMPLIED WARRANTY OF FITNESS FOR A PARTICULAR USE.
+USE AT OWN RISK.
 
 --
 
