@@ -1095,7 +1095,7 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
   [&check;] Job completed with OK(0) status - click to view
   <span style='background-color:red'>[!]</span> Job completed with nonzero status - click to view
 
-  .. that's about it.
+  .. that's <a class="xhrlink" style="text-decoration:none" href="/about">about</a> it.
 	 
   Oh, and in case you need to...
   <a href='/shutdown'>prevent any new jobs for a graceful shutdown</a>   (afterwards, use <strong>/rudeshutdown</strong>)
