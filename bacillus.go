@@ -56,6 +56,7 @@ var (
 	cmdMap               map[string]string
 	runningJobs          runningJobList //map[string]string
 	runningJobsLimit     uint           //max running jobs
+	demoMode             bool           // set to true to disable /shutdown and /rudeshutdown
 	jobHomeDir           string
 	runLogTailLines      int
 	showStagesOnFinished bool
@@ -1145,7 +1146,11 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
-	writeStr(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
+	if demoMode {
+		writeStr(w, fmt.Sprintf("<pre>Shutdown mode disabled by admin.</pre>\n"))
+	} else {
+		writeStr(w, fmt.Sprintf("<pre>Shutdown mode off.</pre>\n"))
+	}
 	writeStr(w, `
 					</body>
 					</html>`)
@@ -1156,7 +1161,6 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 // the admin kills the server or visits /rudeshutdown to tell it to exit.
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
-	shutdownModeActive = true
 	w.Header().Set("Content-type", "text/html")
 	writeStr(w, `
 					<html>
@@ -1166,7 +1170,12 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
-	writeStr(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
+	if demoMode {
+		writeStr(w, fmt.Sprintf("<pre>Shutdown mode disabled by admin.</pre>\n"))
+	} else {
+		shutdownModeActive = true
+		writeStr(w, fmt.Sprintf("<pre>Shutdown mode on. No new jobs can start.</pre>\n"))
+	}
 	writeStr(w, `
 					</body>
 					</html>`)
@@ -1212,11 +1221,18 @@ func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 					</head>
                     <body`+bodyBgndHTMLAttribs()+`>
 					`)
-	writeStr(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
-	writeStr(w, `
+	if demoMode {
+		writeStr(w, fmt.Sprintf("<pre>.. rudeshutdown disabled by admin.</pre>\n"))
+		writeStr(w, `
 					</body>
 					</html>`)
-	killSwitch <- true
+	} else {
+		writeStr(w, fmt.Sprintf("<pre>.. so cold... so very, very cold..</pre>\n"))
+		writeStr(w, `
+					</body>
+					</html>`)
+		killSwitch <- true
+	}
 }
 
 // patchLiveRunEntries looks at a limited back-history of runlog entries
@@ -1345,6 +1361,7 @@ func main() {
 	flag.UintVar(&runningJobsLimit, "jl", 8, "Max. concurrently running jobs")
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.BoolVar(&showStagesOnFinished, "F", false, "set to true to show stages on finished jobs in runlog")
+	flag.BoolVar(&demoMode, "D", false, "set true/1 to enable public demo mode -- users cannot /shutdown or /rudeshutdown")
 	flag.Parse()
 
 	mainCtx := context.Background()

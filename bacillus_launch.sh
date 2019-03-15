@@ -67,6 +67,7 @@ AUTH_PASS=${AUTH_PASS:-"bar"}
 RUNLOG_LIVE_VIEW_LINES=${RUNLOG_LIVE_VIEW_LINES:-30}
 F=${F:-true} # show pipeline stages on finished job runlog entries
 JOBLIMIT=${JOBLIMIT:-"8"} # default, override to set
+DEMO=${DEMO:-false}
 
 ## If better log rotation is desired, use logrotate.
 if [ -e run"${PORT}".log ] && [ ${1:-"n"} == "-r" ]; then
@@ -89,7 +90,7 @@ fi
 ##0 * * * * curl -s --netrc-file $HOME/bacillus-auth.txt https://bacillus.blitter.com/onPush-hkexsh-build >/dev/null 2>&1
 ##
 
-bacillus -F="${F}" -jl="${JOBLIMIT}" -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
+bacillus -D="${DEMO}" -F="${F}" -jl="${JOBLIMIT}" -a=:"${PORT}" -rl="${RUNLOG_LIVE_VIEW_LINES}" \
  -auth=${AUTH} -u=${AUTH_USER} -p=${AUTH_PASS} \
  onPush-bacillus-build:kD::"../bacillus_pushbuild.sh" \
  onPush-hkexsh-build:kD:FOO=bar,BAZ=buzz:"../hkexsh_pushbuild.sh" \
