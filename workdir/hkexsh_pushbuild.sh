@@ -44,6 +44,6 @@ stage "Build"
 make all
 
 stage "Artifacts"
-tar czvf ${BACILLUS_ARTFDIR}/hkexsh.tgz .
+tar -czv --exclude=.git --exclude=cptest -f ${BACILLUS_ARTFDIR}/hkexsh.tgz .
 echo "--Done--"
 
