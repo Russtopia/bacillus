@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	appVer         string = "v0.2.0"
+	appVer         string = "v0.2.1"
 	httpAuthUser          = "bacuser"
 	httpAuthPasswd        = "gramnegative" //b64:"YmFjdXNlcjpncmFtbmVnYXRpdmU="
 	//indStyleNone          = "none"
