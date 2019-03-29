@@ -554,13 +554,17 @@ func manualJobTriggersHTML(fullLogLink bool) (ret string) {
 			// constructed w/param form, rather than a direct XHR to
 			// launch endpoint
 			// ===================
-			if isParameterizedBuildScript(cmdMap[k]) {
-				ret += fmt.Sprintf("<a class='xhrlink' title='Play Job with Parameters' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
-					k, k, cmdMap[k])
+			if _, e := os.Stat(strings.Replace(cmdMap[k], "..", jobHomeDir, -1)); e != nil {
+				ret += fmt.Sprintf("-- job script %s not found --\n", cmdMap[k])
 			} else {
-				fn := strings.Replace(k, "-", "", -1)
-				ret += fmt.Sprintf(`<a class='xhrlink' onclick='%s(); return false;' title='Play Job' href='%s'>[&rtrif;] %s [action %s]</a>`+"\n",
-					fn, k, k, cmdMap[k])
+				if isParameterizedBuildScript(cmdMap[k]) {
+					ret += fmt.Sprintf("<a class='xhrlink' title='Play Job with Parameters' href='%s?param'>[&rtri;] %s [action %s]</a>\n",
+						k, k, cmdMap[k])
+				} else {
+					fn := strings.Replace(k, "-", "", -1)
+					ret += fmt.Sprintf(`<a class='xhrlink' onclick='%s(); return false;' title='Play Job' href='%s'>[&rtrif;] %s [action %s]</a>`+"\n",
+						fn, k, k, cmdMap[k])
+				}
 			}
 		}
 	}
@@ -791,7 +795,7 @@ func execJob(j jobCtx) {
 	dirTmp, _ := filepath.Abs(jobHomeDir)
 	workDir, terr := ioutil.TempDir(dirTmp, fmt.Sprintf("bacillus_%s_%s_", j.jobOpts, j.jobTag))
 	c.Dir = workDir
-	jobID := strings.Split(workDir, "_")[3]
+	jobID := workDir[strings.LastIndex(workDir, "_")+1:]
 	var indent int64
 	var indentStr string
 	if indStyle == indStyleIndent || indStyle == indStyleBoth {
@@ -806,7 +810,12 @@ func execJob(j jobCtx) {
 		var workerOutputFile *os.File
 		consoleFName := "console.out"
 		workerOutputPath = workDir + "/" + consoleFName
-		workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s_%s/%s", jobHomeDir, j.jobOpts, j.jobTag, jobID, consoleFName)
+		workerOutputRelPath := fmt.Sprintf("%s/bacillus_%s_%s_%s/%s",
+			jobHomeDir,
+			j.jobOpts,
+			j.jobTag,
+			jobID,
+			consoleFName)
 		if attachStdout {
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
@@ -838,9 +847,10 @@ func execJob(j jobCtx) {
 		// by the top "/" endpoint to show recently active jobs (ie., those with
 		// workdirs still present)
 		//
-		fmt.Fprintf(c.Stdout, "[r 255]\n")                                                                          //nolint:errcheck
-		fmt.Fprintf(c.Stdout, "%s\n", strings.Replace(workerOutputRelPath, "workdir/", "/workdir/fullconsole/", 1)) //nolint:errcheck
-		fmt.Fprintf(c.Stdout, "%s\n", j.jobTag)                                                                     //nolint:errcheck
+		fmt.Fprintf(c.Stdout, "[r 255]\n") //nolint:errcheck
+		fmt.Fprintf(c.Stdout, "%s\n",
+			strings.Replace(workerOutputRelPath, jobHomeDir, "/"+jobHomeDir+"/fullconsole", 1)) //nolint:errcheck
+		fmt.Fprintf(c.Stdout, "%s\n", j.jobTag) //nolint:errcheck
 
 		cerr := c.Start()
 		if cerr != nil {
@@ -1355,6 +1365,7 @@ func main() {
 	flag.BoolVar(&basicAuth, "auth", true, "enable basic http auth login (be sure to also set -u and -p)")
 	flag.StringVar(&strUser, "u", httpAuthUser, "web UI and endpoint username")
 	flag.StringVar(&strPasswd, "p", httpAuthPasswd, "web UI and endpoint password")
+	flag.StringVar(&jobHomeDir, "w", "workdir", "workdir for jobs (relative to bacillus launch dir)")
 	flag.BoolVar(&createRunlog, "c", false, "set true/1 to create new run.log, overwriting old one")
 	flag.StringVar(&indStyle, "i", indStyleBoth, "job entry indicator style [none|indent|colour|both]")
 	flag.IntVar(&runLogTailLines, "rl", 30, "Scroll length of runlog (set to 0 for no limit)")
@@ -1385,7 +1396,7 @@ func main() {
 
 	//log.Printf("Registering handler for /runlog page.\n")
 	http.HandleFunc("/runlog", runLogHandler)
-	jobHomeDir = "workdir"
+
 	// Each non-switch argument is taken to be an endpoint (job) descriptor
 	// Syntax of an endpoint:
 	//  endpoint:jobOpts:EVAR1=val1,EVAR2=val2[,...,EVAR<n>=val<n>]:cmd
