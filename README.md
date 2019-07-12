@@ -60,9 +60,9 @@ bacill&mu;s launches jobs as child processes, waiting on their exit and tagging 
 The repository contains sample scripts:
 
 * bacillus_launch.sh - launch bacill&mu;s with a few demo endpoints
-* workdir/artifact.sh - simple example that just does 'work' for a short time and leaves artifacts
-* workdir/hkexsh_pushbuild.sh - a slightly more realistic build job for an external project
-* workdir/hkexsh_post-receive.sample - sample git post-receive hook used to trigger the above endpoint
+* example_workdir/artifact.sh - simple example that just does 'work' for a short time and leaves artifacts
+* example_workdir/hkexsh_pushbuild.sh - a slightly more realistic build job for an external project
+* example_workdir/hkexsh_post-receive.sample - sample git post-receive hook used to trigger the above endpoint
 
 In summary, to perform build/CI tasks with bacill&mu;s, one should
 
@@ -89,7 +89,7 @@ A single run of a job will have workdir/ and artifacts/ dirs named ```bacillus_<
 
 ## Scheduling, Storage and Artifact Management
 
-The design of bacill&mu;s follows the Unix tool philosophy: *do one thing and do it well*. As such, scheduling of repeated jobs and reaping of old job workspaces/artifacts to save disk space, archiving etc. are left to external tools (consider using cron, anacron, rsync, etc.). An example cron job to reap old workspaces and artifacts is described within the 'bacillus_launch.sh' script.
+The design of bacill&mu;s follows the Unix tool philosophy: *do one thing and do it well*. As such, scheduling of repeated jobs and reaping of old job workspaces/artifacts to save disk space, archiving etc. are left to external tools (consider using cron, anacron, rsync, etc.). An example cron job to reap old workspaces and artifacts is given within the 'bacillus_launch.sh' script's comments.
 
 
 ## Larger Installations
