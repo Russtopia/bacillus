@@ -608,7 +608,7 @@ func httpAuthSession(w http.ResponseWriter, r *http.Request) (auth bool) {
 // job invocation in a GET or POST request.
 
 func runLogHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	if !httpAuthSession(w, r) {
 		return
 	}
@@ -633,7 +633,7 @@ func runLogHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	if !httpAuthSession(w, r) {
 		return
 	}
@@ -659,7 +659,7 @@ func fullRunlogHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/plain")
+	w.Header().Set("Content-type", "text/plain;charset=UTF-8")
 	if !httpAuthSession(w, r) {
 		return
 	}
@@ -673,7 +673,7 @@ func fullConsoleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func consoleHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	if !httpAuthSession(w, r) {
 		return
 	}
@@ -944,7 +944,7 @@ func execJob(j jobCtx) {
 }
 
 func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	if !httpAuthSession(w, r) {
 		return
 	}
@@ -987,7 +987,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 
 	http.HandleFunc(fmt.Sprintf("/%s", jobTag),
 		func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-type", "text/html")
+			w.Header().Set("Content-type", "text/html;charset=UTF-8")
 
 			jobEnv = origJobEnv // reset each time invoked, we append to it
 
@@ -1060,7 +1060,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 	// See if there are actions (currently just logout)
 	_, ok := r.URL.Query()["logout"]
 	if ok {
-		w.Header().Set("Content-type", "text/html")
+		w.Header().Set("Content-type", "text/html;charset=UTF-8")
 		w.Header().Set("WWW-Authenticate", `Basic realm="Bacillus"`)
 		w.WriteHeader(http.StatusUnauthorized)
 		//writeStr(w, `<head><meta http-equiv="refresh" content="0;URL='/'" /></head>`)
@@ -1068,7 +1068,7 @@ func rootPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	if !httpAuthSession(w, r) {
 		return
 	}
@@ -1118,8 +1118,8 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
 	}
 	writeStr(w, `
   Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
-  <span style='font-size: 8px; position: fixed; bottom: 0; right: 10;'><pre>Qui verifiers ratum efficiat? Non I.</pre></span>
-  </pre>`)
+  <pre style='font-size: 8px; position: fixed; bottom: 0px; right: 10px;'>Best viewed using DejaVu font family --- Qui verifiers ratum efficiat? Non I.</pre>
+`)
 
 	writeStr(w, manualJobTriggersJS())
 	writeStr(w, `
@@ -1147,7 +1147,7 @@ var logoutURI = `javascript:(function(c){var a,b="Logged out.";try{a=document.ex
 func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
 	shutdownModeActive = false
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	writeStr(w, `
 					<html>
 					<head>`+
@@ -1171,7 +1171,7 @@ func cancelShutdownHandler(w http.ResponseWriter, r *http.Request) {
 // the admin kills the server or visits /rudeshutdown to tell it to exit.
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	writeStr(w, `
 					<html>
 					<head>`+
@@ -1223,7 +1223,7 @@ func aboutPageHandler(w http.ResponseWriter, r *http.Request) {
 // before using this endpoint.
 func rudeShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.URL)
-	w.Header().Set("Content-type", "text/html")
+	w.Header().Set("Content-type", "text/html;charset=UTF-8")
 	writeStr(w, `
 					<html>
 					<head>`+

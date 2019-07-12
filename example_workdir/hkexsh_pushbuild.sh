@@ -38,6 +38,9 @@ mkdir -p build
 cd build
 git clone https://gogs.blitter.com/RLabs/hkexsh
 cd hkexsh
+branch=$(git for-each-ref --sort=-committerdate --format='%(refname)' | head -n 1)
+echo "Building most recent push on branch $branch"
+git checkout "$branch"
 ls
 
 #stage "Stuff"
