@@ -18,6 +18,7 @@ import (
 	"log"
 	"math/rand"
 	"sort"
+	"time"
 
 	"net/http"
 	"os"
@@ -28,6 +29,7 @@ import (
 	"syscall"
 
 	"blitter.com/go/brevity"
+	"blitter.com/go/moonphase"
 )
 
 const (
@@ -533,6 +535,28 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 		}
 	}
 	return ret
+}
+
+func sayingFooterHTML() (ret string) {
+	prefix := `<pre style='font-size: 8px; position: fixed; bottom: 0px; right: 10px;'>`
+	suffix := `</pre>`
+	t := time.Now()
+	m := moonphase.New(t)
+	n := m.PhaseName()
+	footerMain := ""
+	switch n {
+	case "New Moon":
+		footerMain = "It is pitch dark. You are likely to be eaten by a Grue."
+	case "Full Moon":
+		footerMain = "Watch out! Full moon tonight."
+	//case "Waxing Gibbous":
+	//		footerMain = "Wolves. Wolves everywhere."
+	default:
+		footerMain = fmt.Sprintf("[%s] ", n) + `Best viewed using DejaVu font family --- Qui verifiers ratum efficiat? Non I.`
+	}
+
+	ret = prefix + footerMain + suffix
+	return
 }
 
 // manualJobTriggersHTML returns an HTML fragment containing href links to
@@ -1117,9 +1141,9 @@ Latest Job Activity (Running jobs:<span id='liveRunLogCount'>`+fmt.Sprintf("%d",
 `)
 	}
 	writeStr(w, `
-  Jobs Served (click Play to manually trigger)`+manualJobTriggersHTML(false)+`
-  <pre style='font-size: 8px; position: fixed; bottom: 0px; right: 10px;'>Best viewed using DejaVu font family --- Qui verifiers ratum efficiat? Non I.</pre>
-`)
+Jobs Served (click Play to manually trigger)`+
+		manualJobTriggersHTML(false)+
+		sayingFooterHTML())
 
 	writeStr(w, manualJobTriggersJS())
 	writeStr(w, `
