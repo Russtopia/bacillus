@@ -58,10 +58,12 @@ git clone https://gogs.blitter.com/Russtopia/bacillus
 cd bacillus
 
 stage "Tests"
-grml tests
+#grml tests #TODO: fix for main.version/gitCommit
+make test
 
 stage "Build"
-grml app
+#grml app #TODO: fix for main.version/gitCommit
+make all
 
 stage "Artifacts"
 
