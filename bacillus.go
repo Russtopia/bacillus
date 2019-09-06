@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	appVer         string = "v0.2.1"
-	httpAuthUser          = "bacuser"
-	httpAuthPasswd        = "gramnegative" //b64:"YmFjdXNlcjpncmFtbmVnYXRpdmU="
+	httpAuthUser   = "bacuser"
+	httpAuthPasswd = "gramnegative" //b64:"YmFjdXNlcjpncmFtbmVnYXRpdmU="
 	//indStyleNone          = "none"
 	indStyleIndent = "indent"
 	indStyleBoth   = "both"
@@ -43,6 +42,9 @@ const (
 )
 
 var (
+	version            string
+	gitCommit          string
+
 	server             *http.Server
 	addrPort           string // eg. ":9990"
 	basicAuth          bool   // flag: basic http auth
@@ -188,13 +190,13 @@ func favIconHTML() string {
 
 // logoShortHdrHTML emits an HTML fragment with the project logo/name/version
 func logoShortHdrHTML() string {
-	return `<img style='float:left;' width='16' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + `</a></pre>`
+	return `<img style='float:left;' width='16' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + version + `</a></pre>`
 }
 
 // logoShortHdrHTML emits an HTML fragment with the project logo/name/version
 // and a link to the project's homepage.
 func logoHdrHTML() string {
-	return `<img style='float:left;' width='16' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + appVer + ` <a target='_' href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
+	return `<img style='float:left;' width='16' src='/images/logo.jpg'/><pre><a href='/'>bacill&mu;s ` + version + ` <a target='_' href='https://gogs.blitter.com/Russtopia/bacillus/src/master/README.md'>(What's this?)</a></pre>`
 }
 
 // bodyBgndHTMLAttribs emits an HTML fragment specifying the CSS background
@@ -1381,8 +1383,6 @@ func patchLiveViewOfRunLogEntries(orig []string, horizon int) (fixed []string) {
 }
 
 func main() {
-	killSwitch = make(chan bool, 1) // ensure a single send can proceed unblocked
-
 	var createRunlog bool
 
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
@@ -1399,6 +1399,7 @@ func main() {
 	flag.BoolVar(&demoMode, "D", false, "set true/1 to enable public demo mode -- users cannot /shutdown or /rudeshutdown")
 	flag.Parse()
 
+	killSwitch = make(chan bool, 1) // ensure a single send can proceed unblocked
 	mainCtx := context.Background()
 
 	cmdMap = make(map[string]string)
@@ -1415,7 +1416,7 @@ func main() {
 	}
 
 	log.SetOutput(logfile)
-	log.Printf("[bacillus %s startup]\n", appVer)
+	log.Printf("[bacillus %s startup]\n", version)
 	log.Printf("[listening on %s]\n", addrPort)
 
 	//log.Printf("Registering handler for /runlog page.\n")

@@ -95,6 +95,15 @@ var htmlReplacer = strings.NewReplacer(
 	"'", "&#39;",
 )
 
+func itemCountStr(l int) (s string) {
+	if l == 1 {
+		s = "1 item"
+	} else {
+		s = fmt.Sprintf("%d items", l)
+	}
+	return
+}
+
 func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 	f, err := os.Open(dir)
 	if err != nil {
@@ -102,13 +111,13 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 		http.Error(w, "Error reading directory", http.StatusInternalServerError)
 		return
 	}
-	dirs, err := f.Readdir(-1)
+	items, err := f.Readdir(-1)
 	if err != nil {
 		log.Printf("http: error reading directory: %v", err)
 		http.Error(w, "Error reading directory", http.StatusInternalServerError)
 		return
 	}
-	sort.Slice(dirs, func(i, j int) bool { return dirs[i].Name() < dirs[j].Name() })
+	sort.Slice(items, func(i, j int) bool { return items[i].Name() < items[j].Name() })
 
 	var headers map[string]string
 	var preamble string
@@ -123,10 +132,11 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 	if upath != "." {
 		_, _ = fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
 	}
-	if len(dirs) == 0 {
+	if len(items) == 0 {
 		_, _ = fmt.Fprintf(w, usrDirListE())
 	} else {
-		for _, d := range dirs {
+		_,_ = fmt.Fprint(w, itemCountStr(len(items))+"\n")
+		for _, d := range items {
 			name := d.Name()
 			if d.IsDir() {
 				name += "/"
@@ -150,7 +160,7 @@ func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
 		favIconHTML() + `
 	</head>
 	<body ` + bodyBgndHTMLAttribs() + `>
-	<img style="float:left;" width="16px" src="/images/logo.jpg"/><pre style='background-color: grey;'><a class="go-http-fs-home" href="/">bacill&mu;s ` + appVer + `</a> ---- directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
+	<img style="float:left;" width="16px" src="/images/logo.jpg"/><pre style='background-color: grey;'><a class="go-http-fs-home" href="/">bacill&mu;s ` + version + `</a> ---- directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
 	<pre>`
 	return
 }
