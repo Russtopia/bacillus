@@ -11,6 +11,9 @@ install: all
 all:
 	go build $(BUILDOPTS) .
 
+test:
+	go test -v .
+
 clean:
 	go clean .
 
