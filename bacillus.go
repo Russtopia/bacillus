@@ -544,15 +544,13 @@ func sayingFooterHTML() (ret string) {
 	suffix := `</pre>`
 	t := time.Now()
 	m := moonphase.New(t)
-	n := m.PhaseName()
+	n := m.PhaseSymbol()
 	footerMain := ""
 	switch n {
 	case "New Moon":
-		footerMain = "It is pitch dark. You are likely to be eaten by a Grue."
+		footerMain = n + " It is pitch dark. You are likely to be eaten by a Grue."
 	case "Full Moon":
-		footerMain = "Watch out! Full moon tonight."
-	//case "Waxing Gibbous":
-	//		footerMain = "Wolves. Wolves everywhere."
+		footerMain = n + " Watch out! Full moon tonight."
 	default:
 		footerMain = fmt.Sprintf("[%s] ", n) + `Best viewed using DejaVu font family --- Qui verifiers ratum efficiat? Non I.`
 	}
