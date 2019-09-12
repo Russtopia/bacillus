@@ -881,7 +881,9 @@ func execJob(j jobCtx, hookData hookEvt) {
 		// raw git post-receive hook rather than a webhook, there will be
 		// no BACILLUS_REF; script usually should default to "refs/master")
 		if hookData.Ref != "" {
-			c.Env = append(c.Env, fmt.Sprintf("BACILLUS_REF=%s", strings.TrimPrefix(hookData.Ref, "heads/")))
+			hookData.Ref = strings.TrimPrefix(hookData.Ref, "refs/")
+			hookData.Ref = strings.TrimPrefix(hookData.Ref, "heads/")
+			c.Env = append(c.Env, fmt.Sprintf("BACILLUS_REF=%s", hookData.Ref))
 		}
 		if len(hookData.Commits) > 0 {
 			c.Env = append(c.Env, fmt.Sprintf("BACILLUS_COMMITID=%s", hookData.Commits[0].Id))
