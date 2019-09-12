@@ -33,6 +33,16 @@ go env
 echo "---"
 echo "passed env:"
 env
+
+echo "---"
+BACILLUS_REF=${BACILLUS_REF:-"undef"}
+BACILLUS_COMMITID=${BACILLUS_COMMITID:-"undef"}
+if [ ${BACILLUS_REF} != "undef" ]; then
+  echo "BACILLUS_REF:" "${BACILLUS_REF}"
+fi
+if [ ${BACILLUS_COMMITID} != "undef" ]; then
+  echo "BACILLUS_COMMITID:" "${BACILLUS_COMMITID}"
+fi
 echo "---"
 
 stage "Clean Workspace"
@@ -56,6 +66,11 @@ mkdir -p build
 cd build
 git clone https://gogs.blitter.com/Russtopia/bacillus
 cd bacillus
+if [ ${BACILLUS_REF} != "undef" ]; then
+  echo -n "Checking out branch ${BACILLUS_REF}..."
+  git checkout ${BACILLUS_REF}
+  echo "done"
+fi
 
 stage "Tests"
 #grml tests #TODO: fix for main.version/gitCommit

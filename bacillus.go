@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -42,8 +43,8 @@ const (
 )
 
 var (
-	version            string
-	gitCommit          string
+	version   string
+	gitCommit string
 
 	server             *http.Server
 	addrPort           string // eg. ":9990"
@@ -552,7 +553,7 @@ func sayingFooterHTML() (ret string) {
 	case "Full Moon":
 		footerMain = n + " Watch out! Full moon tonight."
 	default:
-		footerMain = fmt.Sprintf("[%s] ", n) + `Best viewed using DejaVu font family --- Qui verifiers ratum efficiat? Non I.`
+		footerMain = fmt.Sprintf("%s ", n) + `Best viewed using DejaVu font family --- Qui verifiers ratum efficiat? Non I.`
 	}
 
 	ret = prefix + footerMain + suffix
@@ -785,12 +786,29 @@ type jobCtx struct {
 	jobEnv  []string
 }
 
+type hookEvt struct {
+	Ref         string `json:"ref"`
+	Before      string `json:"before"`
+	After       string `json:"after"`
+	Compare_url string `json:"compare_url"`
+	Commits     []struct {
+		Id      string `json:"id"`
+		Message string `json:"message"`
+		Url     string `json:"url"`
+		Author  struct {
+			Name     string `json:"name"`
+			Email    string `json:"email"`
+			Username string `json:"username"`
+		}
+	}
+}
+
 // execJob spawns the actual job, waiting for it to complete and
 // marks the runlog entry to indicate completion status and supply
 // the artifact link.
 //
 //nolint:gocyclo
-func execJob(j jobCtx) {
+func execJob(j jobCtx, hookData hookEvt) {
 	// Some wrinkles in the exec.Command API: If there are no args,
 	// one must completely omit the args ... to avoid strange errors
 	// with some commands that see a blank "" arg and complain.
@@ -856,6 +874,18 @@ func execJob(j jobCtx) {
 		c.Env = append(c.Env, fmt.Sprintf("BACILLUS_WORKDIR=%s", workDir))
 		c.Env = append(c.Env, fmt.Sprintf("BACILLUS_ARTFDIR=%s", fmt.Sprintf("%s/../../artifacts/bacillus_%s_%s_%s", workDir, j.jobOpts, j.jobTag, jobID)))
 		c.Env = append(c.Env, j.jobEnv...)
+		// Extra environment is provided by webhooks, so we'll set those
+		// separately if JSON is present.
+		// It is the job script's responsibility to check for these and,
+		// if not set, default sensibly (eg., if the push was done by a
+		// raw git post-receive hook rather than a webhook, there will be
+		// no BACILLUS_REF; script usually should default to "refs/master")
+		if hookData.Ref != "" {
+			c.Env = append(c.Env, fmt.Sprintf("BACILLUS_REF=%s", strings.TrimPrefix(hookData.Ref, "refs/")))
+		}
+		if len(hookData.Commits) > 0 {
+			c.Env = append(c.Env, fmt.Sprintf("BACILLUS_COMMITID=%s", hookData.Commits[0].Id))
+		}
 
 		// JOB STATUS METADATA PREPENDED TO console.out
 		// Job output status is encoded in first line of output log.
@@ -1003,8 +1033,8 @@ func jobCancelHandler(w http.ResponseWriter, r *http.Request) {
 // the user may set job parameters before submitting to launch the job.
 //
 // The HTML emitted is selected by whether the visiting URL has
-// no parameters, ?param or ?paramSet: no parameters directly launches a job,
-// ?param emits an HTML form page, and ?paramSet launches the job with the
+// no parameters, ?param or ?usingParams: no parameters directly launches a job,
+// ?param emits an HTML form page, and ?usingParams launches the job with the
 // submitted parameters from the ?param form page.
 func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, jobEnv []string, cmdMap map[string]string) {
 	origJobEnv := jobEnv // saved to reset the env on each invocation
@@ -1019,12 +1049,17 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				return
 			}
 
+			// Check if JSON is present (from a webhook)
+			decoder := json.NewDecoder(r.Body)
+			var hookData = hookEvt{}
+			jsonErr := decoder.Decode(&hookData)
+			_ = jsonErr
 			// Depending on whether the page being emitted is ?param (form)
-			// or ?paramSet (form submission/job launch), set how many
+			// or ?usingParams (form submission/job launch), set how many
 			// pages the launch confirmation page needs to jump back
 			// to return to the dashboard or runlog page.
 			var pagesBack string
-			_, ok := r.URL.Query()["paramSet"]
+			_, ok := r.URL.Query()["usingParams"]
 			if ok {
 				pagesBack = "2"
 			} else {
@@ -1052,8 +1087,8 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			} else if _, ok := r.URL.Query()["param"]; ok {
 				// Get job-defined parameter form
 				bodyFragM = genParameterizedBuildForm(jobTag, cmd)
-			} else if _, ok = r.URL.Query()["paramSet"]; ok {
-				// If we're called back with ?paramSet, which is submitted
+			} else if _, ok = r.URL.Query()["usingParams"]; ok {
+				// If we're called back with ?usingParams, which is submitted
 				// form data from dynamically-generated ?param form above,
 				// parse those values from r.URL.Query(), adding to jobEnv[].
 				r.ParseForm() //nolint:errcheck
@@ -1064,14 +1099,14 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				}
 				bodyFragM = fmt.Sprintf("<pre>Triggered parameterized build %s</pre>\n", jobTag)
 				// Launch parameterized job
-				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
+				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv}, hookEvt{})
 
 				//!A writeStr(w, `<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>`)
 				//!A writeStr(w, `<script>document.getElementById("jobRunSound").play();</script>`)
 			} else {
 				// Launch simple job
 				bodyFragM = fmt.Sprintf("<pre>Triggered %s</pre>\n", jobTag)
-				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv})
+				go execJob(jobCtx{w, mainCtx, jobTag, jobOpts, jobEnv}, hookData)
 				//!A writeStr(w, `<audio id='jobRunSound' type='audio/mpeg' src='audio/13280__schademans__pipe1.mp3'></audio>`)
 				//!A writeStr(w, `<script>document.getElementById("jobRunSound").play();</script>`)
 			}
