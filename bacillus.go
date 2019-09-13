@@ -1064,11 +1064,12 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				if ok {
 					hookData.Ref = gitRef[0]
 				}
-			}
+		}
+		fmt.Println(len(hookData.Commits))
 			if len(hookData.Commits) == 0 {
-				oldId, ok := r.URL.Query()["new"]
+				newId, ok := r.URL.Query()["new"]
 				if ok {
-					hookData.Commits[0].Id = oldId[0]
+					hookData.Commits[0].Id = newId[0]
 				}
 			}
 
