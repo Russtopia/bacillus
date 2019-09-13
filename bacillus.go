@@ -786,21 +786,25 @@ type jobCtx struct {
 	jobEnv  []string
 }
 
+type hookEvtAuthorInfo struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
+
+type hookEvtCommitInfo struct {
+	Id      string `json:"id"`
+	Message string `json:"message"`
+	Url     string `json:"url"`
+	Author  hookEvtAuthorInfo
+}
+
 type hookEvt struct {
 	Ref         string `json:"ref"`
 	Before      string `json:"before"`
 	After       string `json:"after"`
 	Compare_url string `json:"compare_url"`
-	Commits     []struct {
-		Id      string `json:"id"`
-		Message string `json:"message"`
-		Url     string `json:"url"`
-		Author  struct {
-			Name     string `json:"name"`
-			Email    string `json:"email"`
-			Username string `json:"username"`
-		}
-	}
+	Commits     []hookEvtCommitInfo
 }
 
 // execJob spawns the actual job, waiting for it to complete and
@@ -1068,8 +1072,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			if len(hookData.Commits) == 0 {
 				newId, ok := r.URL.Query()["new"]
 				if ok {
-					hookData.Commits[0].Id = newId[0]
-					fmt.Println(len(hookData.Commits))
+					hookData.Commits = append(hookData.Commits, hookEvtCommitInfo{Id: newId[0]})
 				}
 			}
 
