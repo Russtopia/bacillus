@@ -1065,6 +1065,12 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 					hookData.Ref = gitRef[0]
 				}
 			}
+			if len(hookData.Commits) == 0 {
+				oldId, ok := r.URL.Query()["new"]
+				if ok {
+					hookData.Commits[0].Id = oldId[0]
+				}
+			}
 
 			// Depending on whether the page being emitted is ?param (form)
 			// or ?usingParams (form submission/job launch), set how many
