@@ -1071,9 +1071,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			}
 			newId, ok := r.URL.Query()["new"]
 			if ok {
-				fmt.Printf("==%d==\n", len(hookData.Commits))
 				hookData.Commits = append(hookData.Commits, hookEvtCommitInfo{Id: newId[0]})
-				fmt.Printf("==%d==\n", len(hookData.Commits))
 			}
 
 			// Depending on whether the page being emitted is ?param (form)
