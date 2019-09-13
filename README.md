@@ -1,19 +1,19 @@
 # bacill&mu;s - A minimalist Build Automation/CI service
 
 
-bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L**inecount **&mu;**(micro)-**S**ervice) listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from git commit hooks, or anything else one can think of.
+bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L**inecount **&mu;**(micro)-**S**ervice) listens for HTTP GET or POST events, executing specified actions on receipt of matching endpoint requests. Use it to respond to webhooks from SCM managers such as github, gitlab, gogs.io, etc. or from wget or curl requests made from plain git commit hooks, or anything else one can think of.
 
 ![https://gogs.blitter.com/Russtopia/bacillus/raw/master/images/screenshot-1.png](https://gogs.blitter.com/Russtopia/bacillus/raw/master/images/screenshot-1.png)
 
 ## Rationale
 
-The goal of this project is to offer an *extremely* minimal Build Automation and Continuous Integration (CI) system with zero dependencies on large frameworks, VMs or containers. It basically should run on a potato, if that potato can run binaries compiled with Go, without breaking a sweat.
+The goal of this project is to offer an *extremely* minimal Build Automation (BA), Continuous Integration (CI) and Continuous Deployment (CD) system with zero dependencies on large frameworks, VMs or containers. It basically should run on a potato, if that potato can run binaries compiled with Go, without breaking a sweat.
 
-bacill&mu;s is language-agnostic. Any script or binary that can be launched from a shell can also be launched by bacill&mu;s. Job-specific behaviour can (must!) be implemented in whatever language(s) with which the integrator is already fluent, avoiding the learning curve of other build automation tools.
+Bacill&mu;s is language-agnostic. Any script or binary that can be launched from a shell can also be launched by bacill&mu;s. Bacill&mu;s doesn't force you to learn any flavour-of-the-week DSL (Domain-Specific Language).
 
-Core features reflect those the author found essential while using, administering and customizing a more traditional 'butler-based' build automation system for a large dev team over multiple years: experience showed that most of the 'other stuff' was unnecessary and better achieved by utilizing common external tools.
+Core features reflect those the author found essential while using, administering and customizing a more traditional ('butler-based') build automation system for a large dev team over multiple years. Experience showed that most of the 'extra stuff' was unnecessary and better achieved by utilizing common external tools.
 
-bacill&mu;s is a single static binary with nearly zero external configuration. With little to configure, one can be up and running within minutes -- no containers, VMs, or DSLs (Domain-Specific Languages).
+Bacill&mu;s is a single static binary written in Go, with nearly zero external configuration. With so little to configure, one can be up and running within minutes: no containers, VMs, or DSLs (Domain-Specific Languages) required, though you can utilize those additional tools, if you wish, for your BA/CI/CD needs.
 
 If you want a point-and-click build server that lets you make jobs without knowing what a shell or cron scheduler is, this probably isn't for you. But if you want a build server that serves as a launch point, has a minimal but useful web interface, and otherwise *stays out of your way*, read on.
 
@@ -165,3 +165,6 @@ $ sloc *.go
          Go      3   806      744    124   1674   100.0%
 ```
 
+#### ?! This isn't a microservice! It isn't RESTful!
+
+Go away, ya bloody pedant.
