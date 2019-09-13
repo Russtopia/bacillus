@@ -7,13 +7,13 @@ bacill&mu;s (**B**uild **A**utomation/**C**ontinuous **I**ntegration **L**ow-**L
 
 ## Rationale
 
-The goal of this project is to offer an *extremely* minimal Build Automation (BA), Continuous Integration (CI) and Continuous Deployment (CD) system with zero dependencies on large frameworks, VMs or containers. It basically should run on a potato, if that potato can run binaries compiled with Go, without breaking a sweat.
+The goal of this project is to offer an *extremely* minimal Build Automation (BA), Continuous Integration (CI) and Continuous Deployment (CD) system with zero dependencies on large frameworks, VMs or containers (though you can use those from bacill&mu;s jobs, if you must). It basically should run on a potato, if that potato can run binaries compiled with Go, without breaking a sweat.
 
 Bacill&mu;s is language-agnostic. Any script or binary that can be launched from a shell can also be launched by bacill&mu;s. Bacill&mu;s doesn't force you to learn any flavour-of-the-week DSL (Domain-Specific Language).
 
 Core features reflect those the author found essential while using, administering and customizing a more traditional ('butler-based') build automation system for a large dev team over multiple years. Experience showed that most of the 'extra stuff' was unnecessary and better achieved by utilizing common external tools.
 
-Bacill&mu;s is a single static binary written in Go, with nearly zero external configuration. With so little to configure, one can be up and running within minutes: no containers, VMs, or DSLs (Domain-Specific Languages) required, though you can utilize those additional tools, if you wish, for your BA/CI/CD needs.
+Bacill&mu;s is a single static binary written in Go, with nearly zero external configuration.
 
 If you want a point-and-click build server that lets you make jobs without knowing what a shell or cron scheduler is, this probably isn't for you. But if you want a build server that serves as a launch point, has a minimal but useful web interface, and otherwise *stays out of your way*, read on.
 
@@ -82,6 +82,8 @@ Jobs launched by bacill&mu;s get some default environment variables, which shoul
 * **HOME** - home dir of user under which daemon runs
 * **BACILLUS_JOBID** - numerical ID which is the tempDir() suffix added to workdir/ and artifacts/ dir
 * **BACILLUS_JOBTAG** - the 'endpoint tag' specified in the launch arguments for the daemon binding a job to a run script
+* **BACILLUS_REF** - the branch on which the latest push occurred; 'refs/heads/' prefix stripped, if present, so the token is directly usable in a ```git checkout``` command to switch to that branch
+* **BACILLUS_COMMITID** - the latest git commit on the last-pushed branch (**BACILLUS_REF**)
 * **BACILLUS_ARTFDIR** - the *relative* path from the job's launch workdir to the directory where it should, if required, store artifacts (the job script is responsible for creating this dir before use)
 * **NOTE**: All other env vars normally defined for **$USER**, as if logged in via shell, are also given to jobs.
 
