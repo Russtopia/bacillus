@@ -1073,6 +1073,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			fmt.Printf("==%d==\n", len(hookData.Commits))
 			if ok {
 				hookData.Commits = append(hookData.Commits, hookEvtCommitInfo{Id: newId[0]})
+				fmt.Printf("==%d==\n", len(hookData.Commits))
 			}
 
 			// Depending on whether the page being emitted is ?param (form)
@@ -1080,7 +1081,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			// pages the launch confirmation page needs to jump back
 			// to return to the dashboard or runlog page.
 			var pagesBack string
-			_, ok := r.URL.Query()["usingParams"]
+			_, ok = r.URL.Query()["usingParams"]
 			if ok {
 				pagesBack = "2"
 			} else {
