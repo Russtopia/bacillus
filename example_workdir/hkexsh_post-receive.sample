@@ -2,9 +2,14 @@
 
 "/home/git/go/src/github.com/gogs/gogs/gogs" hook --config='/home/git/go/src/github.com/gogs/gogs/custom/conf/app.ini' post-receive
 
+read old new ref
 echo "** push hook"
+echo "** old: ${old}"
+echo "** new: ${new}"
+echo "** ref: ${ref}"
 
 ## NOTE In my setup bacillus is behind a reverse proxy, 'bacillus.blitter.com'
 ## and therefore must be addressed via https://bacillus.blitter.com/
 ## though it runs http:// on port 9990.
-/usr/bin/curl -s https://bacillus.blitter.com/onPush-hkexsh-build >/dev/null 2>&1
+/usr/bin/curl -s "https://bacillus.blitter.com/onPush-hkexsh-build?ref=${ref}&old=${old}&new=${new}" >/dev/null 2>&1
+

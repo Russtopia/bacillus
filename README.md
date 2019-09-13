@@ -57,10 +57,10 @@ Sample installation tree
 
 bacill&mu;s launches jobs as child processes, waiting on their exit and tagging their main stdout/stderr output, named 'console.out' within each worker's workspace (eg., *workdir/bacillus&lt;JOBID&gt;*). No external state or other meta-data is maintained, so there is no way to get out of sync with spawned jobs. If you kill the bacill&mu;s daemon, all currently-running jobs die too in standard UNIX fashion, unless jobs themselves detach via *nohup*.
 
-The repository contains sample scripts:
+The repository contains sample scripts and git hooks:
 
 * bacillus_launch.sh - launch bacill&mu;s with a few demo endpoints
-* example_workdir/artifact.sh - simple example that just does 'work' for a short time and leaves artifacts
+* example_workdir/artifact.sh - an example parameterized job that just does busy-work for a time and leaves artifacts
 * example_workdir/hkexsh_pushbuild.sh - a slightly more realistic build job for an external project
 * example_workdir/hkexsh_post-receive.sample - sample git post-receive hook used to trigger the above endpoint
 
