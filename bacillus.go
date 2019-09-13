@@ -1069,11 +1069,10 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 					hookData.Ref = gitRef[0]
 				}
 			}
-			if len(hookData.Commits) == 0 {
-				newId, ok := r.URL.Query()["new"]
-				if ok {
-					hookData.Commits = append(hookData.Commits, hookEvtCommitInfo{Id: newId[0]})
-				}
+			newId, ok := r.URL.Query()["new"]
+			fmt.Printf("==%d==\n", len(hookData.Commits))
+			if ok {
+				hookData.Commits = append(hookData.Commits, hookEvtCommitInfo{Id: newId[0]})
 			}
 
 			// Depending on whether the page being emitted is ?param (form)
