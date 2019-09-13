@@ -1070,8 +1070,8 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				}
 			}
 			newId, ok := r.URL.Query()["new"]
-			fmt.Printf("==%d==\n", len(hookData.Commits))
 			if ok {
+				fmt.Printf("==%d==\n", len(hookData.Commits))
 				hookData.Commits = append(hookData.Commits, hookEvtCommitInfo{Id: newId[0]})
 				fmt.Printf("==%d==\n", len(hookData.Commits))
 			}
