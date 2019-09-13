@@ -1056,13 +1056,14 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 			var hookData = hookEvt{}
 			jsonErr := decoder.Decode(&hookData)
 			_ = jsonErr
-			
+
 			// git ref from a raw git hook will be used, if present,
 			// and if JSON hook didn't already set it
 			if hookData.Ref == "" {
-			gitRef, ok := r.URL.Query()["ref"]
-			if ok {
-					hookData.Ref = gitRef
+				gitRef, ok := r.URL.Query()["ref"]
+				if ok {
+					hookData.Ref = gitRef[0]
+				}
 			}
 
 			// Depending on whether the page being emitted is ?param (form)
