@@ -472,7 +472,7 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 			if !paramJobLine {
 				// First entry, build form prologue
 
-				// The hidden ?paramSet will trigger
+				// The hidden ?usingParams will trigger
 				// the final stage of same endpoint that
 				// calls this func (launchJob)
 				//
@@ -481,8 +481,8 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 				<h2>` + jobTag + `</h2>
 				<h3>Build with Parameters </h3>
 				<hr />
-				<form action="/` + jobTag + `?paramSet" method="GET">
-				<input type="hidden" name="paramSet" />
+				<form action="/` + jobTag + `?usingParams" method="GET">
+				<input type="hidden" name="usingParams" />
 				`
 			}
 			paramJobLine = true
