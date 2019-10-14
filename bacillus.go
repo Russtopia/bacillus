@@ -546,8 +546,9 @@ func sayingFooterHTML() (ret string) {
 	t := time.Now()
 	m := moonphase.New(t)
 	n := m.PhaseSymbol()
+	nName := m.PhaseName()
 	footerMain := ""
-	switch n {
+	switch nName {
 	case "New Moon":
 		footerMain = n + " It is pitch dark. You are likely to be eaten by a Grue."
 	case "Full Moon":
