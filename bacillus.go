@@ -17,7 +17,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"sort"
 	"time"
 
@@ -832,7 +831,7 @@ func execJob(j jobCtx, hookData hookEvt) {
 
 	var instColourIdx uint32
 	if indStyle == indStyleColour || indStyle == indStyleBoth {
-		instColourIdx = rand.Uint32() % uint32(len(instColours))
+		instColourIdx = instCounter % uint32(len(instColours))
 		instCounter++
 	} else {
 		instColourIdx = 0
