@@ -36,8 +36,8 @@ echo "curDir: $PWD"
 rm -rf build
 mkdir -p build
 cd build
-git clone https://gogs.blitter.com/RLabs/hkexsh
-cd hkexsh
+git clone https://gogs.blitter.com/RLabs/xs
+cd xs
 branch=$(git for-each-ref --sort=-committerdate --format='%(refname)' | head -n 1)
 echo "Building most recent push on branch $branch"
 git checkout "$branch"
@@ -51,12 +51,12 @@ stage "Build"
 make all
 
 stage "Test(Authtoken)"
-echo "Clearing test user $USER ~/.hkexsh_id file ..."
-rm -f ~/.hkexsh_id
-echo "Setting dummy authtoken in ~/.hkexsh_id ..."
-echo "localhost:asdfasdfasdf" >~/.hkexsh_id
+echo "Clearing test user $USER ~/.xs_id file ..."
+rm -f ~/.xs_id
+echo "Setting dummy authtoken in ~/.xs_id ..."
+echo "localhost:asdfasdfasdf" >~/.xs_id
 echo "Performing remote command on @localhost via authtoken login ..."
-tokentest=$(timeout 10 hkexsh -x "echo -n FOO" @localhost)
+tokentest=$(timeout 10 xs -x "echo -n FOO" @localhost)
 if [ "${tokentest}" != "FOO" ]; then
   echo "AUTHTOKEN LOGIN FAILED"
   exit 1
@@ -70,10 +70,10 @@ echo "Testing secure copy from server -> client ..."
 tmpdir=$$
 mkdir -p /tmp/$tmpdir
 cd /tmp/$tmpdir
-hkexcp @localhost:${BACILLUS_WORKDIR}/build/hkexsh/cptest .
+xc @localhost:${BACILLUS_WORKDIR}/build/xs/cptest .
 echo -n "Integrity check on copied files (sha1sum) ..."
 sha1sum $(find cptest -type f | sort) >sc.sha1sum
-diff sc.sha1sum ${BACILLUS_WORKDIR}/build/hkexsh/cptest.sha1sum
+diff sc.sha1sum ${BACILLUS_WORKDIR}/build/xs/cptest.sha1sum
 stat=$?
 
 cd -
@@ -90,10 +90,10 @@ echo "TODO ..."
 
 stage "Artifacts"
 echo -n "Creating tarfile ..."
-tar -cz --exclude=.git --exclude=cptest -f ${BACILLUS_ARTFDIR}/hkexsh.tgz .
+tar -cz --exclude=.git --exclude=cptest -f ${BACILLUS_ARTFDIR}/xs.tgz .
 
 stage "Cleanup"
-rm -f ~/.hkexsh_id
+rm -f ~/.xs_id
 
 echo
 echo "--Done--"
