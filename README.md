@@ -46,7 +46,7 @@ Sample installation tree
 /$HOME/
       bacillus/                       (project tree)
               bacillus                (main binary)
-              workdir/                (home of job scripts and running job workspaces)
+              example_workdir/        (home of job scripts and running job workspaces)
                      jobA.{sh,py,...} (job entry script for 'jobA')
               artifacts/              (where jobs place their 'artifacts' during/after run)
               images/                 (image assets used by main binary)
@@ -127,6 +127,19 @@ Param lines such as the above should start at column 0 alone on a line, after th
 
 A job containing the above would present a form with a text box, a dropdown list and a checkbox for each
 of the job parameters. Each variable is added to the job's environment variables.
+
+NOTE the ?DEFVALUE? above does not ensure a script sets the required variable to a default; it just specifies the HTML form's default value. The job script must itself check for undefined parameters and give them defaults.
+
+### Calling Parameterized Build with Default or Specific Arguments
+
+Parameterized builds should check if their parameters are set or not, and substitute defaults if required.
+
+For example in bash use ```PARAM=${PARAM:-"defaultval"}``` to ensure $PARAM gets a sensible default.
+
+With the above in mind, use curl or wget to trigger a job with one or more non-default parameters:
+
+```$ curl -i "https://<bacillus-server>/<jobName>?usingParams&DELAY=2&SUITE=big&DEBUG=true"```
+
 
 ## Job Pipeline Views
 
