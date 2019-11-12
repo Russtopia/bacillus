@@ -1114,7 +1114,7 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				r.ParseForm() //nolint:errcheck
 				for k, v := range r.Form {
 					if len(v) > 0 {
-						jobEnv = append(jobEnv, k+`="`+v[0]+`"`)
+						jobEnv = append(jobEnv, k+`=`+v[0])
 					}
 				}
 				bodyFragM = fmt.Sprintf("<pre>Triggered parameterized build %s</pre>\n", jobTag)
@@ -1437,6 +1437,7 @@ func patchLiveViewOfRunLogEntries(orig []string, horizon int) (fixed []string) {
 
 func main() {
 	var createRunlog bool
+	var versionFlag bool
 
 	flag.StringVar(&addrPort, "a", ":9990", "[addr]:port on which to listen")
 	flag.BoolVar(&basicAuth, "auth", true, "enable basic http auth login (be sure to also set -u and -p)")
@@ -1450,7 +1451,13 @@ func main() {
 	flag.BoolVar(&attachStdout, "s", false, "set to true to see worker stdout/err if running in terminal")
 	flag.BoolVar(&showStagesOnFinished, "F", false, "set to true to show stages on finished jobs in runlog")
 	flag.BoolVar(&demoMode, "D", false, "set true/1 to enable public demo mode -- users cannot /shutdown or /rudeshutdown")
+	flag.BoolVar(&versionFlag, "v", false, "print version")
 	flag.Parse()
+
+	if versionFlag {
+		fmt.Println("v" + version + "_" + gitCommit[:5])
+		os.Exit(0)
+	}
 
 	killSwitch = make(chan bool, 1) // ensure a single send can proceed unblocked
 	mainCtx := context.Background()
