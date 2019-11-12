@@ -34,40 +34,38 @@ function stage {
   fi
 }
 
-delay=${1:-"5"}
-
 stage "Setup"
 echo "workdir: ${PWD}"
 env
 
 stage "Busywork"
 for i in $(seq 1 4); do
-  echo "Doing some work (sleeping ${delay}). $i ..."
-  sleep ${delay}
+  echo "Doing some work (sleeping ${DELAY}). $i ..."
+  sleep ${DELAY}
 done
 
 stage "S1"
 for i in $(seq 1 4); do
-  echo "Doing some work (sleeping ${delay}). $i ..."
-  sleep ${delay}
+  echo "Doing some work (sleeping ${DELAY}). $i ..."
+  sleep ${DELAY}
 done
 
 stage "S2"
 for i in $(seq 1 4); do
-  echo "Doing some work (sleeping ${delay}). $i ..."
-  sleep ${delay}
+  echo "Doing some work (sleeping ${DELAY}). $i ..."
+  sleep ${DELAY}
 done
 
 stage "S3"
 for i in $(seq 1 4); do
-  echo "Doing some work (sleeping ${delay}). $i ..."
-  sleep ${delay}
+  echo "Doing some work (sleeping ${DELAY}). $i ..."
+  sleep ${DELAY}
 done
 
 stage "S4"
 for i in $(seq 1 4); do
-  echo "Doing some work (sleeping ${delay}). $i ..."
-  sleep ${delay}
+  echo "Doing some work (sleeping ${DELAY}). $i ..."
+  sleep ${DELAY}
 done
 
 stage "Artifacts"
@@ -77,8 +75,8 @@ echo "blah" >"${ADIR}/artifact.txt"
 
 stage "Post Processing"
 for i in $(seq 1 4); do
-  echo "Doing some work (sleeping ${delay}). $i ..."
-  sleep ${delay}
+  echo "Doing some work (sleeping ${DELAY}). $i ..."
+  sleep ${DELAY}
 done
 
 
