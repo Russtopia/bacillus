@@ -7,7 +7,7 @@ export PATH=/usr/local/bin:/usr/bin:/usr/lib/ccache/bin:/bin
 echo "workdir: ${BACILLUS_WORKDIR}"
 mkdir -p "${BACILLUS_ARTFDIR}"
 
-export GO111MODULE=auto
+export GO111MODULE=on
 export GOPATH="${HOME}/go"
 # GOCACHE will be phased out in v1.12. [github.com/golang/go/issues/26809]
 export GOCACHE="${HOME}/.cache/go-build"

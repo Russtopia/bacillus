@@ -88,7 +88,7 @@ fi
 ##
 ##* * * * 1 rm -rf $(find $HOME/bacillus/artifacts $HOME/bacillus/workdir -type d -mmin +1440 -name "bacillus_kD*")
 ##* * 1 * * rm -rf $(find $HOME/bacillus/artifacts $HOME/bacillus/workdir -type d -mmin +10080 -name "bacillus_kW*")
-##0 * * * * curl -s --netrc-file $HOME/bacillus-auth.txt https://bacillus.blitter.com/onPush-hkexsh-build >/dev/null 2>&1
+##0 * * * * curl -s --netrc-file $HOME/bacillus-auth.txt https://bacillus.blitter.com/onPush-xs-build >/dev/null 2>&1
 ##
 
 bacillus -D="${DEMO}"\
