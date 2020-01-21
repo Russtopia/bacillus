@@ -130,12 +130,13 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 	_, _ = fmt.Fprintf(w, preamble)
 
 	if upath != "." {
-		_, _ = fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
+		_, _ = fmt.Fprintf(w,
+			"<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
 	}
 	if len(items) == 0 {
 		_, _ = fmt.Fprintf(w, usrDirListE())
 	} else {
-		_,_ = fmt.Fprint(w, itemCountStr(len(items))+"\n")
+		_, _ = fmt.Fprint(w, itemCountStr(len(items))+"\n")
 		for _, d := range items {
 			name := d.Name()
 			if d.IsDir() {
@@ -145,10 +146,38 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 			// part of the URL path, and not indicate the start of a query
 			// string or fragment.
 			url := url.URL{Path: name}
-			_, _ = fmt.Fprintf(w, "<a class=\"go-http-fs-item\" href=\"%s\">%s</a>\n", url.String(), htmlReplacer.Replace(name))
+			_, _ = fmt.Fprintf(w,
+				"<a class=\"go-http-fs-item\" href=\"%s\">%-48s</a>%-16s%30s\n",
+				url.String(),
+				htmlReplacer.Replace(name),
+				" ",
+				d.ModTime().Format("Mon Jan 2 15:04:05 MST 2006"))
 		}
 	}
 	_, _ = fmt.Fprintf(w, usrDirListPost())
+}
+
+func dirLinkStyle() string {
+		return `
+	<style>
+	a.go-http-fs-item {
+			display: inline-block;
+			text-decoration: none;
+			color: inherit;
+		}
+		a.go-http-fs-item:visited {
+			color: inherit;
+		}
+		a.go-http-fs-item:hover {
+			background-color: aliceblue;
+			text-decoration: underline;
+			text-decoration-style: dotted;
+			cursor: pointer;
+		}
+		a.go-http-fs-item:active {
+			background-color: lightgreen;
+		}
+	</style>`
 }
 
 func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
@@ -157,7 +186,8 @@ func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
 	//hdrs["X-Foo"] = "bacillus dir listing"
 	preamble = `
 	<head>` +
-		favIconHTML() + `
+			favIconHTML() +
+			dirLinkStyle() + `
 	</head>
 	<body ` + bodyBgndHTMLAttribs() + `>
 	<img style="float:left;" width="16px" src="/images/logo.jpg"/><pre style='background-color: grey;'><a class="go-http-fs-home" href="/">bacill&mu;s ` + version + `</a> ---- directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
