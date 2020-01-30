@@ -101,4 +101,5 @@ bacillus -D="${DEMO}"\
  onPush-bacillus-build:kD::"../bacillus_pushbuild.sh" \
  onPush-xs-build:kD:FOO=bar,BAZ=buzz:"../xs_pushbuild.sh" \
  onPush-bacillus-artifact:kW:BACILLUS_FOO=foo,BACILLUS_BAR=bar:"../artifact.sh" \
- onPush-brevity-build:kD::"../brevity_pushbuild.sh"
+ onPush-brevity-build:kD::"../brevity_pushbuild.sh" \
+ onPush-anyrepo-script:kD::"../pushbuild.sh"
