@@ -1,6 +1,6 @@
 MAKEOPTS = $(MAKEOPTS)
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
-VERSION := 0.2.5
+VERSION := 0.2.6
 BUILDOPTS :=$(BUILDOPTS) -ldflags "-X main.version=$(VERSION) -X main.gitCommit=$(GIT_COMMIT)"
 
 .PHONY: install all clean
