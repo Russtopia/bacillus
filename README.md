@@ -138,15 +138,19 @@ For example in bash use ```PARAM=${PARAM:-"defaultval"}``` to ensure $PARAM gets
 
 With the above in mind, use curl or wget to trigger a job with one or more non-default parameters:
 
-```$ curl -i "https://<bacillus-server>/<jobName>?usingParams&DELAY=2&SUITE=big&DEBUG=true"```
+```
+$ curl -i "https://<bacillus-server>/<jobName>?usingParams&DELAY=2&SUITE=big&DEBUG=true"
+```
 
 
-## Job Pipeline Views
+### Job Pipeline Views
 
 There is support for a simple 'pipeline view' of the stages of running jobs. See
 the 'stage' function in examples ```workdir/hkexsh_pushbuild.sh``` and ```workdir/bacillus-pushbuild.sh```. Stages up to and including the running stage will be displayed at the end of the running job's entry in the runlog view.
 
-## Example Run
+
+### Example Run
+
 Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacill&mu;s itself)
 
 [terminal A - CI server]
@@ -172,7 +176,8 @@ $ curl -s --netrc-file hooks/auth.txt http://localhost:9990/onPush-bacillus-buil
 Likewise, a web browser will present a user/pass authorization popup before allowing access to the web interface.
 
 
-## Code Size
+### Code Size
+
 ```
 $ sloc *.go
   Languages  Files  Code  Comment  Blank  Total  CodeLns
@@ -182,4 +187,4 @@ $ sloc *.go
 
 #### ?! This isn't a microservice! It isn't RESTful!
 
-Go away, ya bloody pedant.
+Nope. But I might add a REST API someday, as use cases come up.
