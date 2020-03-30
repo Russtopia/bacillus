@@ -1123,8 +1123,9 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 						if !strings.HasPrefix(k, "NOPATH_") &&
 							!strings.HasSuffix(k, "_URI") {
 							v[0] = strings.Replace(v[0], "../", "", -1)
-							v[0] = strings.TrimPrefix(v[0], "/")
 							v[0] = filepath.Clean(v[0])
+							// filepath will leave a leading root '/' and we dont' want that.
+							v[0] = strings.TrimPrefix(v[0], "/")
 						}
 						jobEnv = append(jobEnv, k+`=`+v[0])
 					}
