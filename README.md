@@ -130,6 +130,9 @@ of the job parameters. Each variable is added to the job's environment variables
 
 NOTE the ?DEFVALUE? above does not ensure a script sets the required variable to a default; it just specifies the HTML form's default value. The job script must itself check for undefined parameters and give them defaults.
 
+**SECURITY** String parameters (?s?...) named with a NOPATH\_ prefix or a \_URI suffix **are exempt from path sanitization.** Use caution naming job parameters in this manner, being sure not to interpret such variables as filesystem paths within job scripts to prevent path-traversal security violations (ie., running arbitrary binaries or scripts from outside the ```workdir/${BACILLUS_JOBID}``` dir).
+
+
 ### Calling Parameterized Build with Default or Specific Arguments
 
 Parameterized builds should check if their parameters are set or not, and substitute defaults if required.
