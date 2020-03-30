@@ -23,8 +23,13 @@ function stage {
 }
 #################################################
 
+#
+# Note REPO_URI is implicitly exempted from sanitization due to _URI suffix
+###
 #-?s?REPO?xs?Repo Name
 #-?s?REPO_URI?https://gogs.blitter.com/RLabs/xs?SCM URI of repo
+#-?s?NOPATH_STRPARAM?./..//../Not_/../a_path?NOPATH_ prefix suppresses path sanitization (caveat emptor)
+#-?s?STRPARAM?./..//.././../foo/bar?should end up as foo/bar
 #-?s?SCRIPT?ci_pushbuild.sh?Entry script within $REPO_URI/bacillus
 # --
 #
@@ -36,6 +41,9 @@ function stage {
 # --
 export REPO=${REPO:-"xs"}
 export REPO_URI=${REPO_URI:-"https://gogs.blitter.com/RLabs/$REPO"}
+
+echo "NOPATH_ str param: ${NOPATH_STRPARAM}"
+echo "regular str param (path-sanitized): ${STRPARAM}"
 
 stage "Clone"
 echo "curDir: $PWD"

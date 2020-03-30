@@ -496,17 +496,6 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 			}
 
 			switch paramFields[1] {
-			case "s":
-				ret += fmt.Sprintf("%s:<input type='text' name='%s' value='%s' />&nbsp;%s<br />\n",
-					paramFields[2], paramFields[2], paramFields[3],
-					paramComment)
-			case "c":
-				choices := strings.Split(paramFields[3], "|")
-				ret += paramFields[2] + ":<select name='" + paramFields[2] + "'>\n"
-				for _, c := range choices {
-					ret += "  <option value='" + c + "'>" + c + "</option>\n"
-				}
-				ret += "</select>&nbsp;" + paramComment + "<br />\n"
 			case "b":
 				// NOTE the 'b' bool type uses HTML input type='checkbox'
 				// which sends nothing if unset. (eg., the job should
@@ -527,6 +516,21 @@ func genParameterizedBuildForm(jobTag, scriptFName string) (ret string) {
 				//	ret += "value='false'"
 				//}
 				ret += "/>&nbsp;" + paramComment + "<br />\n"
+			case "c":
+				choices := strings.Split(paramFields[3], "|")
+				ret += paramFields[2] + ":<select name='" + paramFields[2] + "'>\n"
+				for _, c := range choices {
+					ret += "  <option value='" + c + "'>" + c + "</option>\n"
+				}
+				ret += "</select>&nbsp;" + paramComment + "<br />\n"
+			case "s":
+				if strings.HasPrefix(paramFields[2], "NOPATH_") ||
+					strings.HasSuffix(paramFields[2], "_URI") {
+					paramComment = paramComment + " <em style='color: red'> WARNING: unsanitized (see docs)</em>"
+				}
+				ret += fmt.Sprintf("%s:<input type='text' name='%s' value='%s' />&nbsp;%s<br />\n",
+					paramFields[2], paramFields[2], paramFields[3],
+					paramComment)
 			}
 		} else if paramJobLine {
 			// End of param specifiers, emit form epilogue
@@ -1114,6 +1118,14 @@ func launchJobListener(mainCtx context.Context, cmd, jobTag, jobOpts string, job
 				r.ParseForm() //nolint:errcheck
 				for k, v := range r.Form {
 					if len(v) > 0 {
+						// Only skip path sanitization if variable is explicitly named
+						// to avoid it
+						if !strings.HasPrefix(k, "NOPATH_") &&
+							!strings.HasSuffix(k, "_URI") {
+							v[0] = strings.Replace(v[0], "../", "", -1)
+							v[0] = strings.TrimPrefix(v[0], "/")
+							v[0] = filepath.Clean(v[0])
+						}
 						jobEnv = append(jobEnv, k+`=`+v[0])
 					}
 				}
