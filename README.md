@@ -61,8 +61,8 @@ The repository contains sample scripts and git hooks:
 
 * bacillus_launch.sh - launch bacill&mu;s with a few demo endpoints
 * example_workdir/artifact.sh - an example parameterized job that just does busy-work for a time and leaves artifacts
-* example_workdir/hkexsh_pushbuild.sh - a slightly more realistic build job for an external project
-* example_workdir/hkexsh_post-receive.sample - sample git post-receive hook used to trigger the above endpoint
+* example_workdir/xs_pushbuild.sh - a slightly more realistic build job for an external project
+* example_workdir/xs_post-receive.sample - sample git post-receive hook used to trigger the above endpoint
 
 In summary, to perform build/CI tasks with bacill&mu;s, one should
 
@@ -130,7 +130,7 @@ of the job parameters. Each variable is added to the job's environment variables
 
 NOTE the ?DEFVALUE? above does not ensure a script sets the required variable to a default; it just specifies the HTML form's default value. The job script must itself check for undefined parameters and give them defaults.
 
-**SECURITY** String parameters (?s?...) named with a NOPATH\_ prefix or a \_URI suffix **are exempt from path sanitization.** Use caution naming job parameters in this manner, being sure not to interpret such variables as filesystem paths within job scripts to prevent path-traversal security violations (ie., running arbitrary binaries or scripts from outside the ```workdir/${BACILLUS_JOBID}``` dir).
+**SECURITY** String parameters (?s?...) named with a NOPATH\_ prefix or a \_URI suffix **are exempt from path sanitization.** Use caution naming job parameters in this manner, being sure not to interpret such variables as filesystem paths or URIs within job scripts, to prevent path-traversal security violations (ie., running arbitrary binaries or scripts from outside the ```workdir/${BACILLUS_JOBID}``` dir).
 
 
 ### Calling Parameterized Build with Default or Specific Arguments
@@ -149,12 +149,12 @@ $ curl -i "https://<bacillus-server>/<jobName>?usingParams&DELAY=2&SUITE=big&DEB
 ### Job Pipeline Views
 
 There is support for a simple 'pipeline view' of the stages of running jobs. See
-the 'stage' function in examples ```workdir/hkexsh_pushbuild.sh``` and ```workdir/bacillus-pushbuild.sh```. Stages up to and including the running stage will be displayed at the end of the running job's entry in the runlog view.
+the 'stage' function in examples ```workdir/xs_pushbuild.sh``` and ```workdir/bacillus-pushbuild.sh```. Stages up to and including the running stage will be displayed at the end of the running job's entry in the runlog view.
 
 
 ### Example Run
 
-Prerequisites: golang (for example hkexsh_pushbuild.sh build script as well as bacill&mu;s itself)
+Prerequisites: golang (for example xs_pushbuild.sh build script as well as bacill&mu;s itself)
 
 [terminal A - CI server]
 ```
