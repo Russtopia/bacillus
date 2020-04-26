@@ -49,6 +49,13 @@ func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !httpAuthSession(w, r) {
 		return
 	}
+
+	sortOrder := "newest" // name || newest || oldest
+	v, ok := r.URL.Query()["sort"]
+	if ok {
+		fmt.Sscanf(v[0], "%s", &sortOrder) // nolint:errcheck
+	}
+
 	rootpath, _ := filepath.Abs(strings.TrimPrefix(fs.Root, "/"))
 	upath := r.URL.EscapedPath()
 	//upath := path.Clean(r.URL.Path)
@@ -69,7 +76,7 @@ func (fs FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		dirList(w, r, fullpath, upath)
+		dirList(w, r, fullpath, upath, sortOrder)
 		return
 	}
 	fs.Handler.ServeHTTP(w, r)
@@ -104,7 +111,7 @@ func itemCountStr(l int) (s string) {
 	return
 }
 
-func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
+func dirList(w http.ResponseWriter, r *http.Request, dir, upath, sortOrder string) {
 	f, err := os.Open(dir)
 	if err != nil {
 		log.Printf("http: error reading directory: %v", err)
@@ -117,7 +124,23 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 		http.Error(w, "Error reading directory", http.StatusInternalServerError)
 		return
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].Name() < items[j].Name() })
+	var sortFunc func(i, j int) bool
+	switch sortOrder {
+	case "name":
+		sortFunc = func(i, j int) bool { return items[i].Name() < items[j].Name() }
+	case "oldest":
+		sortFunc = func(i, j int) bool {
+			return items[i].ModTime().Before(items[j].ModTime())
+		}
+	case "newest":
+		fallthrough
+	default:
+		sortFunc = func(i, j int) bool {
+			return items[i].ModTime().After(items[j].ModTime())
+		}
+	}
+
+	sort.Slice(items, sortFunc)
 
 	var headers map[string]string
 	var preamble string
@@ -158,7 +181,7 @@ func dirList(w http.ResponseWriter, r *http.Request, dir string, upath string) {
 }
 
 func dirLinkStyle() string {
-		return `
+	return `
 	<style>
 	a.go-http-fs-item {
 			display: inline-block;
@@ -186,8 +209,8 @@ func usrDirListPre(r *http.Request) (hdrs map[string]string, preamble string) {
 	//hdrs["X-Foo"] = "bacillus dir listing"
 	preamble = `
 	<head>` +
-			favIconHTML() +
-			dirLinkStyle() + `
+		favIconHTML() +
+		dirLinkStyle() + `
 	</head>
 	<body ` + bodyBgndHTMLAttribs() + `>
 	<img style="float:left;" width="16px" src="/images/logo.jpg"/><pre style='background-color: grey;'><a class="go-http-fs-home" href="/">bacill&mu;s ` + version + `</a> ---- directory: ` + fmt.Sprintf(r.URL.Path) + ` ----</pre>
