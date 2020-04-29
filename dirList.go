@@ -125,19 +125,26 @@ func dirList(w http.ResponseWriter, r *http.Request, dir, upath, sortOrder strin
 		return
 	}
 	var sortFunc func(i, j int) bool
+	nameDelim := []string{"", ""}
+	newestDelim := []string{"", ""}
+	oldestDelim := []string{"", ""}
+
 	switch sortOrder {
 	case "name":
 		sortFunc = func(i, j int) bool { return items[i].Name() < items[j].Name() }
+		nameDelim = []string{"(", ")"}
 	case "oldest":
 		sortFunc = func(i, j int) bool {
 			return items[i].ModTime().Before(items[j].ModTime())
 		}
+		oldestDelim = []string{"(", ")"}
 	case "newest":
 		fallthrough
 	default:
 		sortFunc = func(i, j int) bool {
 			return items[i].ModTime().After(items[j].ModTime())
 		}
+		newestDelim = []string{"(", ")"}
 	}
 
 	sort.Slice(items, sortFunc)
@@ -154,7 +161,7 @@ func dirList(w http.ResponseWriter, r *http.Request, dir, upath, sortOrder strin
 
 	if upath != "." {
 		_, _ = fmt.Fprintf(w,
-			"<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>\n\n")
+			"<a class=\"go-http-fs-item\" href=\"..\">-- up --</a>&nbsp;&nbsp;Sort by:&nbsp;<a class=\"go-http-fs-item\" href=\"?sort=name\">"+nameDelim[0]+"name"+nameDelim[1]+"</a>&nbsp;|&nbsp;<a class=\"go-http-fs-item\" href=\"?sort=newest\">"+newestDelim[0]+"newest"+newestDelim[1]+"</a>&nbsp;|&nbsp;<a class=\"go-http-fs-item\" href=\"?sort=oldest\">"+oldestDelim[0]+"oldest"+oldestDelim[1]+"</a>\n\n")
 	}
 	if len(items) == 0 {
 		_, _ = fmt.Fprintf(w, usrDirListE())

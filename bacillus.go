@@ -42,8 +42,8 @@ const (
 )
 
 var (
-	version   string
-	gitCommit string
+	version   string = "?"
+	gitCommit string = "00000"
 
 	server             *http.Server
 	addrPort           string // eg. ":9990"
